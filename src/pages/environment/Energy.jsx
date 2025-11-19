@@ -1,3 +1,4 @@
+// src/pages/environment/Energy.jsx
 import React, { useContext, useEffect, useState } from "react";
 import { Line } from "react-chartjs-2";
 import {
@@ -9,9 +10,9 @@ import {
   Tooltip,
   Legend,
 } from "chart.js";
-import { FaFilePdf } from "react-icons/fa";
-import { SimulationContext } from "../../context/SimulationContext";
+import { FaFilePdf, FaSun } from "react-icons/fa"; // Added FaSun for the header icon
 import { jsPDF } from "jspdf";
+import { SimulationContext } from "../../context/SimulationContext";
 
 ChartJS.register(
   LineElement,
@@ -23,12 +24,21 @@ ChartJS.register(
 );
 
 export default function Energy() {
-  const { environmentalMetrics, environmentalInsights, loading } =
-    useContext(SimulationContext);
+  const {
+    environmentalMetrics,
+    environmentalInsights,
+    environmentalBenchmarks,
+    loading,
+    error,
+  } = useContext(SimulationContext);
 
-  const [emissionDataValues, setEmissionDataValues] = useState([]);
-  const [productionDataValues, setProductionDataValues] = useState([]);
-  const [intensityValues, setIntensityValues] = useState([]);
+  const [energyUseValues, setEnergyUseValues] = useState(new Array(12).fill(0));
+  const [productionDataValues, setProductionDataValues] = useState(
+    new Array(12).fill(0)
+  );
+  const [energyIntensityValues, setEnergyIntensityValues] = useState(
+    new Array(12).fill(0)
+  );
   const [topInsights, setTopInsights] = useState([]);
 
   const monthlyLabels = [
@@ -46,21 +56,33 @@ export default function Energy() {
     "Dec-24",
   ];
 
-  useEffect(() => {
-    const emissions = (environmentalMetrics?.co2Emissions || []).concat(
-      Array(12 - (environmentalMetrics?.co2Emissions?.length || 0)).fill(0)
-    );
-    const production = (environmentalMetrics?.production || []).concat(
-      Array(12 - (environmentalMetrics?.production?.length || 0)).fill(0)
-    );
-    const intensity = emissions.map((e, i) => {
-      const p = production[i] || 1;
-      return parseFloat((e / p).toFixed(2));
+  const toTwelve = (arr) =>
+    monthlyLabels.map((_, i) => {
+      const v = Array.isArray(arr) ? arr[i] : 0;
+      return typeof v === "number" && Number.isFinite(v) ? v : 0;
     });
 
-    setEmissionDataValues(emissions);
-    setProductionDataValues(production);
-    setIntensityValues(intensity);
+  useEffect(() => {
+    if (environmentalMetrics) {
+      const energyUseRaw = environmentalMetrics.energyUse || [];
+      const productionRaw = environmentalMetrics.production || [];
+
+      const energyUse12 = toTwelve(energyUseRaw);
+      const production12 = toTwelve(productionRaw);
+
+      const energyIntensity12 = energyUse12.map((e, i) => {
+        const p = production12[i] || 1;
+        return Number((e / p).toFixed(4));
+      });
+
+      setEnergyUseValues(energyUse12);
+      setProductionDataValues(production12);
+      setEnergyIntensityValues(energyIntensity12);
+    } else {
+      setEnergyUseValues(new Array(12).fill(0));
+      setProductionDataValues(new Array(12).fill(0));
+      setEnergyIntensityValues(new Array(12).fill(0));
+    }
 
     const insights =
       environmentalInsights && environmentalInsights.length > 0
@@ -70,19 +92,56 @@ export default function Energy() {
     setTopInsights(insights);
   }, [environmentalMetrics, environmentalInsights]);
 
-  const emissionData = {
+  // ---------- AI-style baseline / benchmark calculations ----------
+  const formatNumber = (value, decimals = 1) => {
+    if (value === null || value === undefined || Number.isNaN(value)) {
+      return "N/A";
+    }
+    return Number(value).toFixed(decimals);
+  };
+
+  const nonZeroIntensities = energyIntensityValues.filter((v) => v > 0);
+
+  let baselineIntensity = null;
+  if (nonZeroIntensities.length > 0) {
+    const baselineSlice = nonZeroIntensities.slice(0, 3);
+    baselineIntensity =
+      baselineSlice.reduce((sum, v) => sum + v, 0) / baselineSlice.length;
+  }
+
+  let currentIntensity = null;
+  if (nonZeroIntensities.length > 0) {
+    currentIntensity = nonZeroIntensities[nonZeroIntensities.length - 1];
+  }
+
+  const benchmarkIntensityRaw =
+    environmentalBenchmarks?.energyIntensity ?? baselineIntensity;
+
+  const comparisonDelta =
+    currentIntensity != null && benchmarkIntensityRaw != null
+      ? currentIntensity - benchmarkIntensityRaw
+      : null;
+
+  const comparisonPercent =
+    currentIntensity != null &&
+    benchmarkIntensityRaw != null &&
+    benchmarkIntensityRaw !== 0
+      ? (comparisonDelta / benchmarkIntensityRaw) * 100
+      : null;
+
+  const energyData = {
     labels: monthlyLabels,
     datasets: [
       {
-        label: "Energy-Related Emissions (tCO₂e)",
-        data: emissionDataValues,
-        borderColor: "#ef4444",
-        backgroundColor: "rgba(239,68,68,0.2)",
+        label: "Energy Use (MWh)",
+        data: energyUseValues,
+        borderColor: "#10b981",
+        backgroundColor: "rgba(16,185,129,0.2)",
         tension: 0.35,
         pointRadius: 3,
       },
       {
-        label: "Production Output (Tonnes)",
+        label: "Production Output (tonnes)",
         data: productionDataValues,
         borderColor: "#2563eb",
         backgroundColor: "rgba(37,99,235,0.2)",
@@ -96,10 +155,10 @@ export default function Energy() {
     labels: monthlyLabels,
     datasets: [
       {
-        label: "Energy Intensity (MWh/Tonnes)",
-        data: intensityValues,
-        borderColor: "#10b981",
-        backgroundColor: "rgba(16,185,129,0.2)",
+        label: "Energy Intensity (MWh per tonne)",
+        data: energyIntensityValues,
+        borderColor: "#6366f1",
+        backgroundColor: "rgba(99,102,241,0.2)",
         tension: 0.35,
         pointRadius: 3,
       },
@@ -112,7 +171,7 @@ export default function Energy() {
 
     doc.setFont("helvetica", "bold");
     doc.setFontSize(20);
-    doc.text("AfricaESG.AI Energy Performance Report", 14, y);
+    doc.text("AfricaESG.AI Energy Use Report", 14, y);
 
     y += 10;
     doc.setFont("helvetica", "normal");
@@ -120,124 +179,317 @@ export default function Energy() {
     doc.text(`Generated: ${new Date().toLocaleDateString()}`, 14, y);
 
     y += 10;
-    doc.text("Energy-Related Emissions & Production:", 14, y);
+    doc.text("Energy Use & Production:", 14, y);
     y += 8;
 
     monthlyLabels.forEach((label, idx) => {
-      const line = `${label}: Emissions ${emissionDataValues[idx] || 0} tCO₂e, Production ${
+      const line = `${label}: Energy Use ${
+        energyUseValues[idx] || 0
+      } MWh, Production ${
         productionDataValues[idx] || 0
-      } tonnes, Intensity ${intensityValues[idx] || 0} MWh/tonne`;
-      const lines = doc.splitTextToSize(line, 180);
-      doc.text(lines, 14, y);
-      y += lines.length * 6;
+      } tonnes, Intensity ${energyIntensityValues[idx] || 0} MWh/tonne`;
+      const wrapped = doc.splitTextToSize(line, 180);
+      doc.text(wrapped, 14, y);
+      y += wrapped.length * 6;
     });
 
     y += 10;
     doc.setFont("helvetica", "bold");
-    doc.text("AI Mini Report on Energy Performance:", 14, y);
+    doc.text("AI Analysis – Energy Performance:", 14, y);
     y += 8;
 
     (topInsights.length > 0
       ? topInsights
-      : ["No AI insights available for energy performance."]
+      : ["No AI insights available for this dataset."]
     ).forEach((note) => {
-      const lines = doc.splitTextToSize(`• ${note}`, 180);
+      const wrapped = doc.splitTextToSize(`• ${note}`, 180);
       doc.setFont("helvetica", "normal");
-      doc.text(lines, 14, y);
-      y += lines.length * 6;
+      doc.text(wrapped, 14, y);
+      y += wrapped.length * 6;
     });
 
     doc.save("AfricaESG_EnergyReport.pdf");
   };
 
+  const showEmptyState =
+    !loading && !error && energyUseValues.every((v) => v === 0) && productionDataValues.every((v) => v === 0);
+
+  const latestIndex = energyUseValues.length - 1;
+  const latestEnergyUse = energyUseValues[latestIndex] || 0;
+  const latestProduction = productionDataValues[latestIndex] || 0;
+  const latestIntensity = energyIntensityValues[latestIndex] || 0;
+
   return (
-    <div className="min-h-screen bg-lime-50 py-10 font-sans flex justify-center">
+    <div className="min-h-screen bg-gradient-to-b from-teal-50 via-lime-50/40 to-teal-50 py-10 font-sans flex justify-center">
       <div className="w-full max-w-7xl px-4 sm:px-6 lg:px-8">
         {/* Header */}
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
           <div>
-            <h1 className="text-3xl sm:text-4xl font-extrabold text-green-900">
-              Energy Performance
+            <p className="text-xs uppercase tracking-[0.2em] text-teal-600 font-semibold mb-1">
+              Environmental · Energy
+            </p>
+            <h1 className="flex items-center gap-2 text-3xl sm:text-4xl font-extrabold text-teal-900 tracking-tight">
+              <FaSun className="text-teal-700 text-3xl sm:text-4xl" />
+              <span>Energy Use & Intensity</span>
             </h1>
             <p className="mt-2 text-sm text-gray-600 max-w-xl">
-              Analyse energy-related emissions, production and intensity for key
-              facilities such as Germiston Factory.
+              Track energy use, production and intensity across your operations
+              with AI insights for performance improvement.
             </p>
+            {loading && (
+              <p className="mt-2 text-xs text-teal-700 flex items-center gap-2">
+                <span className="h-2 w-2 rounded-full bg-teal-500 animate-pulse" />
+                Loading energy metrics and AI insights…
+              </p>
+            )}
+            {error && <p className="mt-2 text-xs text-red-500">{error}</p>}
           </div>
 
-          {/* Only download button, no back arrow */}
           <button
             onClick={handleDownloadReport}
-            className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg shadow-md flex items-center gap-2 text-sm md:text-base font-medium transition-transform hover:scale-105"
+            className="bg-teal-600 hover:bg-teal-700 text-white px-4 py-2 rounded-full shadow-md flex items-center gap-2 text-sm md:text-base font-medium transition-transform hover:scale-105"
           >
             <FaFilePdf className="text-white text-base md:text-lg" />
             Download Energy Report
           </button>
         </div>
 
-        {/* Main Layout */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Left Section: Charts */}
-          <div className="lg:col-span-2 space-y-6">
-            {/* Emissions vs Production Chart */}
-            <div className="bg-white rounded-2xl shadow-lg border border-gray-200 p-6">
-              <h2 className="text-xl sm:text-2xl font-semibold text-gray-800 mb-4 text-center">
-                Germiston Factory – Emissions vs Production
-              </h2>
-              <div className="h-64 sm:h-72">
-                <Line
-                  data={emissionData}
-                  options={{
-                    maintainAspectRatio: false,
-                    plugins: { legend: { position: "bottom" } },
-                    scales: {
-                      x: { grid: { display: false } },
-                      y: { grid: { color: "#e5e7eb" } },
-                    },
-                  }}
-                />
+        {/* Quick Stats */}
+        {!showEmptyState && (
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+            <div className="bg-white/80 backdrop-blur rounded-2xl border border-teal-100 shadow-sm px-4 py-3">
+              <p className="text-xs font-semibold text-teal-700 uppercase tracking-wide mb-1">
+                Latest Energy Use
+              </p>
+              <p className="text-2xl font-bold text-teal-900">
+                {latestEnergyUse.toLocaleString()}{" "}
+                <span className="text-xs font-medium text-gray-500">MWh</span>
+              </p>
+              <p className="mt-1 text-xs text-gray-500">
+                Energy consumed in the latest reporting month.
+              </p>
+            </div>
+            <div className="bg-white/80 backdrop-blur rounded-2xl border border-teal-100 shadow-sm px-4 py-3">
+              <p className="text-xs font-semibold text-teal-700 uppercase tracking-wide mb-1">
+                Latest Production
+              </p>
+              <p className="text-2xl font-bold text-teal-900">
+                {latestProduction.toLocaleString()}{" "}
+                <span className="text-xs font-medium text-gray-500">
+                  tonnes
+                </span>
+              </p>
+              <p className="mt-1 text-xs text-gray-500">
+                Output associated with current energy profile.
+              </p>
+            </div>
+            <div className="bg-white/80 backdrop-blur rounded-2xl border border-teal-100 shadow-sm px-4 py-3">
+              <p className="text-xs font-semibold text-teal-700 uppercase tracking-wide mb-1">
+                Latest Energy Intensity
+              </p>
+              <p className="text-2xl font-bold text-teal-900">
+                {latestIntensity.toFixed(2)}{" "}
+                <span className="text-xs font-medium text-gray-500">
+                  MWh / tonne
+                </span>
+              </p>
+              <p className="mt-1 text-xs text-gray-500">
+                Energy efficiency for production.
+              </p>
+            </div>
+          </div>
+        )}
+
+        {showEmptyState ? (
+          <div className="bg-white rounded-2xl shadow-lg border border-dashed border-teal-200 p-10 text-center text-gray-600">
+            <p className="text-base font-medium mb-2">
+              No energy metrics available yet.
+            </p>
+            <p className="text-sm text-gray-500 max-w-lg mx-auto">
+              Upload ESG data on the main dashboard to populate energy use and
+              intensity for this view.
+            </p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Charts */}
+            <div className="lg:col-span-2 space-y-6">
+              <div className="bg-white rounded-2xl shadow-lg border border-teal-100/70 p-6">
+                <div className="flex items-center justify-between mb-2">
+                  <h2 className="text-xl sm:text-2xl font-semibold text-gray-800">
+                    Energy Use vs Production (Monthly)
+                  </h2>
+                  <span className="text-[11px] px-2 py-1 rounded-full bg-teal-50 text-teal-700 font-semibold uppercase tracking-wide">
+                    Uploaded dataset
+                  </span>
+                </div>
+                <p className="text-xs text-gray-500 mb-4">
+                  Monthly energy consumption compared with production volumes.
+                </p>
+                <div className="h-64 sm:h-72">
+                  <Line
+                    data={energyData}
+                    options={{
+                      maintainAspectRatio: false,
+                      plugins: {
+                        legend: { position: "bottom", labels: { boxWidth: 12 } },
+                      },
+                      scales: {
+                        x: { grid: { display: false } },
+                        y: {
+                          grid: { color: "#e5e7eb" },
+                          beginAtZero: true,
+                        },
+                      },
+                    }}
+                  />
+                </div>
+              </div>
+
+              <div className="bg-white rounded-2xl shadow-lg border border-teal-100/70 p-6">
+                <div className="flex items-center justify-between mb-2">
+                  <h2 className="text-xl sm:text-2xl font-semibold text-gray-800">
+                    Energy Intensity (MWh per tonne)
+                  </h2>
+                  <span className="text-[11px] px-2 py-1 rounded-full bg-emerald-50 text-emerald-700 font-semibold uppercase tracking-wide">
+                    Energy KPI
+                  </span>
+                </div>
+                <p className="text-xs text-gray-500 mb-4">
+                  Energy consumption normalised by production.
+                </p>
+                <div className="h-64 sm:h-72">
+                  <Line
+                    data={intensityData}
+                    options={{
+                      maintainAspectRatio: false,
+                      plugins: {
+                        legend: { position: "bottom", labels: { boxWidth: 12 } },
+                      },
+                      scales: {
+                        x: { grid: { display: false } },
+                        y: {
+                          grid: { color: "#e5e7eb" },
+                          beginAtZero: true,
+                        },
+                      },
+                    }}
+                  />
+                </div>
               </div>
             </div>
 
-            {/* Energy Intensity Chart */}
-            <div className="bg-white rounded-2xl shadow-lg border border-gray-200 p-6">
-              <h2 className="text-xl sm:text-2xl font-semibold text-gray-800 mb-4 text-center">
-                Energy Intensity (MWh / tonne)
-              </h2>
-              <div className="h-64 sm:h-72">
-                <Line
-                  data={intensityData}
-                  options={{
-                    maintainAspectRatio: false,
-                    plugins: { legend: { position: "bottom" } },
-                    scales: {
-                      x: { grid: { display: false } },
-                      y: { grid: { color: "#e5e7eb" } },
-                    },
-                  }}
-                />
+            {/* AI baseline / benchmark / comparison / recommendations */}
+            <div className="bg-white rounded-2xl shadow-lg border border-teal-100/80 p-6 flex flex-col">
+              <div className="flex items-center justify-between mb-2">
+                <h2 className="text-xl font-semibold text-gray-800">
+                  AI Analysis – Energy
+                </h2>
+                <span className="inline-flex items-center gap-1 rounded-full bg-teal-50 px-3 py-1 text-[11px] font-semibold text-teal-700 uppercase tracking-wide">
+                  <span className="h-2 w-2 rounded-full bg-teal-500 animate-pulse" />
+                  Live AI
+                </span>
+              </div>
+              <p className="text-xs text-gray-500 mb-3">
+                Baseline, benchmark and performance vs target for energy
+                intensity, plus AI recommendations.
+              </p>
+
+              {/* 1. Baseline */}
+              <div className="mb-4">
+                <h3 className="text-sm font-semibold text-gray-700 mb-1">
+                  1. Baseline
+                </h3>
+                {baselineIntensity == null ? (
+                  <p className="text-xs text-gray-500">
+                    Upload at least one month of energy use data to establish
+                    a baseline intensity.
+                  </p>
+                ) : (
+                  <p className="text-sm text-gray-700">
+                    Average baseline energy intensity is{" "}
+                    <span className="font-semibold">
+                      {formatNumber(baselineIntensity)} MWh/tonne
+                    </span>
+                    .
+                  </p>
+                )}
+              </div>
+
+              {/* 2. Benchmark */}
+              <div className="mb-4">
+                <h3 className="text-sm font-semibold text-gray-700 mb-1">
+                  2. Benchmark
+                </h3>
+                {benchmarkIntensityRaw == null ? (
+                  <p className="text-xs text-gray-500">
+                    No benchmark available yet. The baseline is currently used
+                    as a proxy.
+                  </p>
+                ) : (
+                  <p className="text-sm text-gray-700">
+                    Benchmark energy intensity is{" "}
+                    <span className="font-semibold">
+                      {formatNumber(benchmarkIntensityRaw)} MWh/tonne
+                    </span>
+                    .
+                  </p>
+                )}
+              </div>
+
+              {/* 3. Performance vs benchmark */}
+              <div className="mb-4">
+                <h3 className="text-sm font-semibold text-gray-700 mb-1">
+                  3. Performance vs benchmark
+                </h3>
+                {comparisonDelta == null ? (
+                  <p className="text-xs text-gray-500">
+                    No current performance data to compare to benchmark yet.
+                  </p>
+                ) : (
+                  <p className="text-sm text-gray-700">
+                    Latest intensity is{" "}
+                    <span className="font-semibold">
+                      {formatNumber(currentIntensity)} MWh/tonne
+                    </span>{" "}
+                    which is{" "}
+                    <span
+                      className={`font-semibold ${
+                        comparisonDelta > 0
+                          ? "text-red-600"
+                          : "text-emerald-600"
+                      }`}
+                    >
+                      {formatNumber(Math.abs(comparisonPercent), 1)}%
+                      {comparisonDelta > 0 ? " above" : " below"}
+                    </span>{" "}
+                    the benchmark.
+                  </p>
+                )}
+              </div>
+
+              {/* 4. AI Recommendations */}
+              <div className="mt-2">
+                <h3 className="text-sm font-semibold text-gray-700 mb-2">
+                  4. AI Recommendations
+                </h3>
+                <ul className="list-disc list-inside text-gray-700 space-y-2 text-sm sm:text-base leading-relaxed max-h-[260px] overflow-y-auto pr-1">
+                  {loading ? (
+                    <li className="text-gray-400">
+                      Loading AI insights for energy…
+                    </li>
+                  ) : topInsights.length > 0 ? (
+                    topInsights.map((note, idx) => <li key={idx}>{note}</li>)
+                  ) : (
+                    <li className="text-gray-400">
+                      No AI insights available for this dataset yet.
+                    </li>
+                  )}
+                </ul>
               </div>
             </div>
           </div>
-
-          {/* Right Section: AI Insights */}
-          <div className="bg-white rounded-2xl shadow-lg border border-gray-200 p-6">
-            <h2 className="text-xl font-semibold text-gray-800 mb-3">
-              AI Mini Report on Energy Performance
-            </h2>
-            <ul className="list-disc list-inside text-gray-700 space-y-2 text-sm sm:text-base leading-relaxed max-h-[650px] overflow-y-auto">
-              {loading ? (
-                <li className="text-gray-400">Loading AI insights...</li>
-              ) : topInsights.length > 0 ? (
-                topInsights.map((note, index) => <li key={index}>{note}</li>)
-              ) : (
-                <li className="text-gray-400">
-                  No AI insights available for this dataset.
-                </li>
-              )}
-            </ul>
-          </div>
-        </div>
+        )}
       </div>
     </div>
   );

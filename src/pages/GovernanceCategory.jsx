@@ -1,16 +1,163 @@
-import React, { useContext } from "react";
-import { FaFilePdf } from "react-icons/fa";
-import { SimulationContext } from "../context/SimulationContext";
+// src/pages/GovernanceCategory.jsx
+import React, { useContext, useEffect, useState } from "react";
+import { FaFilePdf, FaBalanceScale, FaShieldAlt, FaUserShield, FaTruck } from "react-icons/fa";
 import { jsPDF } from "jspdf";
+import { SimulationContext } from "../context/SimulationContext";
+
+const API_BASE = "http://localhost:5000";
 
 const GovernanceCategory = () => {
   const { governanceMetrics, governanceInsights, loading } =
     useContext(SimulationContext);
 
-  const topInsights =
-    governanceInsights && governanceInsights.length > 0
-      ? governanceInsights
-      : [];
+  const insights = governanceInsights || [];
+
+  // Governance summary coming directly from /api/esg-data (updated on upload)
+  const [governanceSummary, setGovernanceSummary] = useState(null);
+
+  useEffect(() => {
+    const fetchSummary = async () => {
+      try {
+        const res = await fetch(`${API_BASE}/api/esg-data`);
+        const data = await res.json();
+        setGovernanceSummary(data?.mockData?.summary?.governance || null);
+      } catch (err) {
+        console.error("Error fetching governance summary:", err);
+        setGovernanceSummary(null);
+      }
+    };
+
+    fetchSummary();
+  }, []);
+
+  // Helpers
+  const metricsVal = (field, fallback = "N/A") =>
+    governanceMetrics && governanceMetrics[field] != null
+      ? governanceMetrics[field]
+      : fallback;
+
+  const summaryVal = (field, fallback = "N/A") =>
+    governanceSummary && governanceSummary[field] != null
+      ? governanceSummary[field]
+      : fallback;
+
+  // Badge style helper
+  const valueBadgeClass = (value) => {
+    if (!value && value !== 0) {
+      return "bg-gray-100 text-gray-500 border border-gray-200";
+    }
+    const v = String(value).toLowerCase();
+
+    if (
+      v.includes("yes") ||
+      v.includes("compliant") ||
+      v.includes("iso") ||
+      v.includes("aligned") ||
+      v.includes("high")
+    ) {
+      return "bg-emerald-50 text-emerald-800 border border-emerald-200";
+    }
+    if (v.includes("no") || v.includes("incident") || v.includes("risk")) {
+      return "bg-red-50 text-red-700 border border-red-200";
+    }
+    return "bg-amber-50 text-amber-800 border border-amber-200";
+  };
+
+  // Build the sections using REAL fields from uploaded ESG data
+  const governanceSections = [
+    {
+      key: "corporate",
+      title: "Corporate Governance",
+      description:
+        "Board governance, reporting standards and governance-related training.",
+      icon: <FaBalanceScale className="text-orange-600" />,
+      accent: "bg-orange-500",
+      rows: [
+        {
+          metric: "Reporting Standard / Framework",
+          value:
+            summaryVal(
+              "corporateGovernance",
+              metricsVal("corporateGovernance")
+            ) || "Compliant",
+        },
+        {
+          metric: "ISO 9001 Compliance",
+          value: summaryVal("iso9001Compliance", metricsVal("isoCompliance")),
+        },
+        {
+          metric: "Governance Trainings Delivered",
+          value: summaryVal("totalGovernanceTrainings"),
+        },
+        {
+          metric: "Environmental Trainings Delivered",
+          value: summaryVal("totalEnvironmentalTrainings"),
+        },
+      ],
+    },
+    {
+      key: "ethics",
+      title: "Business Ethics & Compliance",
+      description:
+        "Code of ethics, corruption risk and overall compliance performance.",
+      icon: <FaShieldAlt className="text-emerald-600" />,
+      accent: "bg-emerald-500",
+      rows: [
+        {
+          metric: "Business Ethics Rating",
+          value: summaryVal("businessEthics"),
+        },
+        {
+          metric: "Compliance Findings (No.)",
+          value: summaryVal("totalComplianceFindings"),
+        },
+        {
+          metric: "Code of Ethics / Anti-Bribery Policy",
+          value: metricsVal("codeOfEthics", "Yes/No"),
+        },
+      ],
+    },
+    {
+      key: "privacy",
+      title: "Data Privacy & Cyber Security",
+      description:
+        "Data protection controls and information security policies.",
+      icon: <FaUserShield className="text-sky-600" />,
+      accent: "bg-sky-500",
+      rows: [
+        {
+          metric: "Data Privacy Status",
+          value: metricsVal("dataPrivacy", "Compliant"),
+        },
+        {
+          metric: "Information Security Policy",
+          value: metricsVal("informationSecurityPolicy", "Yes/No"),
+        },
+      ],
+    },
+    {
+      key: "supply-chain",
+      title: "Supply Chain Governance",
+      description:
+        "Supplier ESG compliance and audit coverage across the value chain.",
+      icon: <FaTruck className="text-amber-600" />,
+      accent: "bg-amber-500",
+      rows: [
+        {
+          metric: "% Suppliers Meeting ESG / Sustainability Criteria",
+          value: metricsVal("supplierSustainabilityCompliance"),
+        },
+        {
+          metric: "% Audited Suppliers Completed",
+          value: metricsVal("supplierAuditsCompleted"),
+        },
+        {
+          metric: "Supplier ESG Compliance",
+          value: metricsVal("supplierEsgCompliance"),
+        },
+      ],
+    },
+  ];
 
   const handleDownloadReport = () => {
     const doc = new jsPDF();
@@ -18,129 +165,158 @@ const GovernanceCategory = () => {
 
     doc.setFont("helvetica", "bold");
     doc.setFontSize(20);
-    doc.text("AfricaESG.AI Governance Report", 14, y);
+    doc.text("AfricaESG.AI Governance Mini Report", 14, y);
 
     y += 10;
     doc.setFont("helvetica", "normal");
     doc.setFontSize(12);
     doc.text(`Generated: ${new Date().toLocaleDateString()}`, 14, y);
 
+    // Governance sections (from uploaded data)
     y += 10;
     doc.setFont("helvetica", "bold");
-    doc.text("Governance Metrics:", 14, y);
+    doc.text("Governance Metrics (from latest ESG upload):", 14, y);
     y += 8;
 
-    if (governanceMetrics) {
-      Object.entries(governanceMetrics).forEach(([key, value]) => {
-        const lines = doc.splitTextToSize(`${key}: ${value}`, 180);
+    governanceSections.forEach((section) => {
+      doc.setFont("helvetica", "bold");
+      doc.text(section.title, 14, y);
+      y += 6;
+
+      section.rows.forEach((row) => {
         doc.setFont("helvetica", "normal");
+        const lines = doc.splitTextToSize(
+          `${row.metric}: ${row.value ?? "N/A"}`,
+          180
+        );
         doc.text(lines, 14, y);
         y += lines.length * 6;
       });
-    }
 
-    y += 10;
-    doc.setFont("helvetica", "bold");
-    doc.text("AI Insights:", 14, y);
-    y += 8;
-
-    (topInsights.length > 0
-      ? topInsights
-      : ["No AI insights available for governance."]
-    ).forEach((note) => {
-      const lines = doc.splitTextToSize(`• ${note}`, 180);
-      doc.setFont("helvetica", "normal");
-      doc.text(lines, 14, y);
-      y += lines.length * 6;
+      y += 4;
     });
 
-    doc.save("AfricaESG_GovernanceReport.pdf");
+    // AI mini report
+    y += 6;
+    doc.setFont("helvetica", "bold");
+    doc.text("AI Mini Report (LIVE AI):", 14, y);
+    y += 8;
+
+    (insights.length > 0 ? insights : ["No AI insights available."]).forEach(
+      (note) => {
+        const lines = doc.splitTextToSize(`• ${note}`, 180);
+        doc.setFont("helvetica", "normal");
+        doc.text(lines, 14, y);
+        y += lines.length * 6;
+      }
+    );
+
+    doc.save("AfricaESG_GovernanceMiniReport.pdf");
   };
 
   return (
     <div className="min-h-screen bg-lime-50 py-10 font-sans flex justify-center">
       <div className="w-full max-w-7xl px-4 sm:px-6 lg:px-8">
-
         {/* Header */}
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 w-full gap-4">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
           <div>
-            <h1 className="text-3xl sm:text-4xl font-extrabold text-green-900 tracking-tight">
+            <h1 className="text-3xl sm:text-4xl font-extrabold text-orange-900 tracking-tight">
               Governance Performance
             </h1>
-            <p className="mt-2 text-sm text-gray-600 max-w-xl">
-              Monitor governance structures, compliance posture and ethical
-              controls across your ESG framework.
+            <p className="mt-2 text-sm sm:text-base text-gray-600 max-w-2xl">
+              Corporate governance, ethics, data privacy and supply chain
+              governance – populated from your latest ESG upload and enhanced
+              with live AI insights.
             </p>
           </div>
 
           <button
             onClick={handleDownloadReport}
-            className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg shadow-md flex items-center gap-2 text-sm md:text-base font-semibold transition-transform hover:scale-105"
+            className="bg-orange-600 hover:bg-orange-700 text-white px-4 sm:px-5 py-2.5 rounded-xl shadow-md flex items-center gap-2 text-sm md:text-base font-semibold transition-transform hover:scale-105"
           >
-            <FaFilePdf className="text-white text-base md:text-lg" /> Download Governance Report
+            <FaFilePdf className="text-white text-base md:text-lg" />
+            <span>Generate Report (PDF)</span>
           </button>
         </div>
 
-        {/* Main Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          
-          {/* Governance Metrics */}
-          <div className="col-span-1 lg:col-span-2 bg-white p-6 sm:p-8 rounded-2xl shadow-lg border border-gray-200">
-            <h2 className="text-xl sm:text-2xl font-semibold text-gray-800 mb-6">
-              Governance Metrics
-            </h2>
+        {/* Main Content */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Governance cards grid */}
+          <div className="lg:col-span-2">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+              {governanceSections.map((section) => (
+                <div
+                  key={section.key}
+                  className="bg-white rounded-2xl shadow-lg border border-gray-200 overflow-hidden flex flex-col h-full"
+                >
+                  {/* Accent bar */}
+                  <div className={`${section.accent} h-1.5 w-full`} />
 
-            <div className="space-y-6 text-gray-700 text-sm sm:text-base leading-relaxed">
-              <section>
-                <h3 className="text-lg font-semibold text-green-800 mb-2">
-                  Corporate Governance
-                </h3>
-                <p>
-                  Corporate Governance:{" "}
-                  {governanceMetrics?.corporateGovernance || "N/A"}
-                </p>
-                <p>
-                  Data Privacy: {governanceMetrics?.dataPrivacy || "N/A"}
-                </p>
-                <p>
-                  ISO Compliance: {governanceMetrics?.isoCompliance || "N/A"}
-                </p>
-              </section>
+                  <div className="p-5 sm:p-6 flex-1 flex flex-col">
+                    <div className="flex items-start gap-3 mb-4">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-orange-50">
+                        {section.icon}
+                      </div>
+                      <div>
+                        <h2 className="text-base sm:text-lg font-semibold text-gray-900">
+                          {section.title}
+                        </h2>
+                        <p className="mt-1 text-xs sm:text-sm text-gray-500">
+                          {section.description}
+                        </p>
+                      </div>
+                    </div>
 
-              <section>
-                <h3 className="text-lg font-semibold text-green-800 mb-2">
-                  Business Ethics & Compliance
-                </h3>
-                <p>ESG Integration: Yes</p>
-                <p>Supply Chain: No</p>
-                <p>Audit Compliance: Yes</p>
-              </section>
+                    <div className="mt-2 space-y-2 border-t border-gray-100 pt-3">
+                      {section.rows.map((row) => (
+                        <div
+                          key={row.metric}
+                          className="flex items-start justify-between gap-3"
+                        >
+                          <p className="text-xs sm:text-sm text-gray-700 pr-2">
+                            {row.metric}
+                          </p>
+                          <span
+                            className={`whitespace-nowrap inline-flex items-center px-2.5 py-1 rounded-full text-[11px] sm:text-xs font-semibold ${valueBadgeClass(
+                              row.value
+                            )}`}
+                          >
+                            {row.value ?? "N/A"}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
 
-          {/* AI Mini Report */}
-          <div className="bg-white p-6 rounded-2xl shadow-lg border border-gray-200">
-            <h2 className="text-xl font-semibold text-gray-800 mb-3">
-              AI Mini Report on Governance
+          {/* AI Insights – right column */}
+          <div className="bg-white p-5 sm:p-6 rounded-2xl shadow-lg border border-gray-200 flex flex-col lg:sticky lg:top-6">
+            <h2 className="text-xl font-semibold text-gray-800 mb-2">
+              AI Mini Report – Governance (LIVE)
             </h2>
+            <p className="text-xs sm:text-sm text-gray-500 mb-3">
+              Live AI insights based on your latest governance, ethics, privacy
+              and supply chain metrics.
+            </p>
 
             {loading ? (
-              <p className="text-gray-500 italic">Loading AI insights...</p>
-            ) : topInsights.length > 0 ? (
-              <ul className="list-disc list-inside space-y-2 text-sm sm:text-base leading-relaxed max-h-[600px] overflow-y-auto">
-                {topInsights.map((note, idx) => (
+              <p className="text-gray-500 italic">Fetching live AI insights…</p>
+            ) : insights.length > 0 ? (
+              <ul className="list-disc list-inside space-y-2 text-sm leading-relaxed max-h-[650px] overflow-y-auto">
+                {insights.map((note, idx) => (
                   <li key={idx}>{note}</li>
                 ))}
               </ul>
             ) : (
               <p className="text-gray-500 italic">
-                No AI insights available for governance.
+                No AI insights available for governance metrics.
               </p>
             )}
           </div>
-
         </div>
-
       </div>
     </div>
   );

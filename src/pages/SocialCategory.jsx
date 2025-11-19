@@ -1,5 +1,6 @@
+// src/pages/SocialCategory.jsx
 import React, { useContext } from "react";
-import { Pie, Bar } from "react-chartjs-2";
+import { Bar, Pie } from "react-chartjs-2";
 import {
   Chart as ChartJS,
   ArcElement,
@@ -10,9 +11,8 @@ import {
   Legend,
 } from "chart.js";
 import { FaFilePdf } from "react-icons/fa";
-import { useNavigate } from "react-router-dom";
-import { SimulationContext } from "../context/SimulationContext";
 import { jsPDF } from "jspdf";
+import { SimulationContext } from "../context/SimulationContext";
 
 ChartJS.register(
   ArcElement,
@@ -26,61 +26,36 @@ ChartJS.register(
 const SocialCategory = () => {
   const { socialMetrics, socialInsights, loading } =
     useContext(SimulationContext);
-  const navigate = useNavigate();
 
-  const topInsights =
-    socialInsights && socialInsights.length > 0 ? socialInsights : [];
+  const supplierDiversity = socialMetrics?.supplierDiversity ?? 3;
+  const employeeEngagement = socialMetrics?.employeeEngagement ?? 70;
+  const communityPrograms = socialMetrics?.communityPrograms ?? 40;
 
-  const supplierData = {
-    labels: ["EME", "Large", "Medium", "SMME"],
+  const diversityData = {
+    labels: ["Diverse Suppliers", "Other Suppliers"],
     datasets: [
       {
-        label: "Supplier Count",
-        data: [
-          socialMetrics?.supplierDiversity || 0,
-          Math.floor(Math.random() * 50 + 10),
-          Math.floor(Math.random() * 30 + 5),
-          Math.floor(Math.random() * 25 + 5),
-        ],
-        backgroundColor: ["#16a34a", "#22c55e", "#f59e0b", "#3b82f6"],
-        borderRadius: 4,
-        barThickness: 16,
-      },
-    ],
-  };
-
-  const humanCapitalData = {
-    labels: ["Black", "White", "Asian", "Other"],
-    datasets: [
-      {
-        data: [
-          socialMetrics?.employeeEngagement || 0,
-          100 - (socialMetrics?.employeeEngagement || 0),
-          Math.floor(Math.random() * 10),
-          Math.floor(Math.random() * 5),
-        ],
-        backgroundColor: ["#16a34a", "#22c55e", "#f59e0b", "#3b82f6"],
+        data: [supplierDiversity, Math.max(0, 100 - supplierDiversity)],
+        backgroundColor: ["#16a34a", "#e5e7eb"],
         hoverOffset: 6,
       },
     ],
   };
 
   const engagementData = {
-    labels: ["Stakeholder Surveys", "Supplier Survey", "CSI"],
+    labels: ["Employee Engagement", "Community Programmes"],
     datasets: [
       {
-        label: "Community Engagement",
-        data: [
-          socialMetrics?.communityPrograms || 0,
-          Math.floor(Math.random() * 40 + 20),
-          Math.floor(Math.random() * 50 + 30),
-        ],
-        backgroundColor: ["#16a34a", "#22c55e", "#f59e0b"],
+        label: "Score (%)",
+        data: [employeeEngagement, communityPrograms],
+        backgroundColor: ["#3b82f6", "#f59e0b"],
         borderRadius: 4,
-        barThickness: 14,
+        barThickness: 32,
       },
     ],
   };
+
+  const insights = socialInsights || [];
 
   const handleDownloadReport = () => {
     const doc = new jsPDF();
@@ -101,7 +76,10 @@ const SocialCategory = () => {
     y += 8;
 
     Object.entries(socialMetrics || {}).forEach(([key, value]) => {
-      const lines = doc.splitTextToSize(`${key}: ${value}`, 180);
+      const lines = doc.splitTextToSize(
+        `${key}: ${JSON.stringify(value)}`,
+        180
+      );
       doc.setFont("helvetica", "normal");
       doc.text(lines, 14, y);
       y += lines.length * 6;
@@ -109,18 +87,17 @@ const SocialCategory = () => {
 
     y += 10;
     doc.setFont("helvetica", "bold");
-    doc.text("AI Mini Report – Social:", 14, y);
+    doc.text("AI Mini Report (LIVE AI):", 14, y);
     y += 8;
 
-    (topInsights.length > 0
-      ? topInsights
-      : ["No AI insights available for social metrics."]
-    ).forEach((note) => {
-      const lines = doc.splitTextToSize(`• ${note}`, 180);
-      doc.setFont("helvetica", "normal");
-      doc.text(lines, 14, y);
-      y += lines.length * 6;
-    });
+    (insights.length > 0 ? insights : ["No AI insights available."]).forEach(
+      (note) => {
+        const lines = doc.splitTextToSize(`• ${note}`, 180);
+        doc.setFont("helvetica", "normal");
+        doc.text(lines, 14, y);
+        y += lines.length * 6;
+      }
+    );
 
     doc.save("AfricaESG_SocialMiniReport.pdf");
   };
@@ -128,70 +105,77 @@ const SocialCategory = () => {
   return (
     <div className="min-h-screen bg-lime-50 py-10 font-sans flex justify-center">
       <div className="w-full max-w-7xl px-4 sm:px-6 lg:px-8">
-
         {/* Header */}
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 w-full gap-4">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
           <div>
-            <h1 className="text-3xl sm:text-4xl font-extrabold text-green-900 tracking-tight">
+            <h1 className="text-3xl sm:text-4xl font-extrabold text-blue-900 tracking-tight">
               Social Performance
             </h1>
             <p className="mt-2 text-sm text-gray-600 max-w-xl">
-              Track supplier diversity, human capital and community engagement
-              across your social ESG profile.
+              Supplier diversity, employee engagement and community impact,
+              powered by live AI insights from AfricaESG.AI.
             </p>
           </div>
 
           <button
             onClick={handleDownloadReport}
-            className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg shadow-md flex items-center gap-2 text-sm md:text-base font-semibold transition-transform hover:scale-105"
+            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg shadow-md flex items-center gap-2 text-sm md:text-base font-semibold transition-transform hover:scale-105"
           >
-            <FaFilePdf className="text-white text-base md:text-lg" /> Download Report
+            <FaFilePdf className="text-white text-base md:text-lg" />
+            Download Report
           </button>
         </div>
 
-        {/* Charts & Insights */}
+        {/* Main Content */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Charts */}
+          {/* Charts Section */}
           <div className="col-span-1 lg:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="bg-white p-6 rounded-2xl shadow-lg border border-gray-200">
-              <h2 className="text-xl font-semibold text-gray-800 mb-4 text-center">
-                Supplier Distribution
+              <h2 className="text-xl sm:text-2xl font-semibold text-gray-800 mb-4 text-center">
+                Supplier Diversity (% Spend)
               </h2>
-              <div className="h-48">
-                <Bar data={supplierData} options={{ responsive: true }} />
+              <div className="h-56 sm:h-64">
+                <Pie
+                  data={diversityData}
+                  options={{
+                    maintainAspectRatio: false,
+                    plugins: { legend: { position: "bottom" } },
+                  }}
+                />
               </div>
             </div>
 
             <div className="bg-white p-6 rounded-2xl shadow-lg border border-gray-200">
-              <h2 className="text-xl font-semibold text-gray-800 mb-4 text-center">
-                Human Capital
+              <h2 className="text-xl sm:text-2xl font-semibold text-gray-800 mb-4 text-center">
+                Engagement & Community Scores
               </h2>
-              <div className="h-48">
-                <Pie data={humanCapitalData} />
-              </div>
-            </div>
-
-            <div className="bg-white p-6 rounded-2xl shadow-lg border border-gray-200 md:col-span-2">
-              <h2 className="text-xl font-semibold text-gray-800 mb-4 text-center">
-                Community Engagement
-              </h2>
-              <div className="h-48">
-                <Bar data={engagementData} />
+              <div className="h-56 sm:h-64">
+                <Bar
+                  data={engagementData}
+                  options={{
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                      x: { grid: { display: false } },
+                      y: { beginAtZero: true, grid: { color: "#e5e7eb" } },
+                    },
+                  }}
+                />
               </div>
             </div>
           </div>
 
-          {/* AI Report */}
-          <div className="bg-white p-6 rounded-2xl shadow-lg border border-gray-200">
+          {/* AI Insights */}
+          <div className="bg-white p-5 sm:p-6 rounded-2xl shadow-lg border border-gray-200 flex flex-col lg:sticky lg:top-6">
             <h2 className="text-xl font-semibold text-gray-800 mb-3">
-              AI Mini Report – Social
+              AI Mini Report – Social (LIVE)
             </h2>
 
             {loading ? (
-              <p className="text-gray-500 italic">Loading AI insights...</p>
-            ) : topInsights.length > 0 ? (
-              <ul className="list-disc list-inside space-y-2 text-sm leading-relaxed max-h-[600px] overflow-y-auto">
-                {topInsights.map((note, idx) => (
+              <p className="text-gray-500 italic">Fetching live AI insights…</p>
+            ) : insights.length > 0 ? (
+              <ul className="list-disc list-inside space-y-2 text-sm sm:text-base leading-relaxed max-h-[650px] overflow-y-auto">
+                {insights.map((note, idx) => (
                   <li key={idx}>{note}</li>
                 ))}
               </ul>
@@ -202,7 +186,6 @@ const SocialCategory = () => {
             )}
           </div>
         </div>
-
       </div>
     </div>
   );

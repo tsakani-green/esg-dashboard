@@ -1,3 +1,4 @@
+// src/App.jsx
 import React, { useState } from "react";
 import {
   BrowserRouter as Router,
@@ -17,14 +18,22 @@ import SocialCategory from "./pages/SocialCategory";
 import GovernanceCategory from "./pages/GovernanceCategory";
 import Insights from "./pages/Insights";
 
-// Environmental sub-pages (under src/pages/environment)
+// Environmental sub-pages
 import Energy from "./pages/environment/Energy";
 import Carbon from "./pages/environment/Carbon";
 import Water from "./pages/environment/Water";
 import Waste from "./pages/environment/Waste";
 import Coal from "./pages/environment/Coal";
 
-// Error Boundary wrapper
+// Governance sub-pages
+import CorporateGovernance from "./pages/governance/CorporateGovernance";
+import EthicsCompliance from "./pages/governance/EthicsCompliance";
+import DataPrivacySecurity from "./pages/governance/DataPrivacySecurity";
+import SupplyChainGovernance from "./pages/governance/SupplyChainGovernance";
+
+// Data Import / Operational View
+import DataImport from "./pages/DataImport";
+
 import ErrorBoundaryWrapper from "./components/ErrorBoundaryWrapper";
 
 function App() {
@@ -75,15 +84,21 @@ function App() {
             }
           />
 
-          {/* ESG Compliance main (Navbar: ESG Compliance) */}
+          {/* Data Import / Operational View */}
           <Route
-            path="/dashboard/esg"
+            path="/dashboard/data-import"
             element={
-              isAuthenticated ? <Insights /> : <Navigate to="/" />
+              isAuthenticated ? <DataImport /> : <Navigate to="/" />
             }
           />
 
-          {/* Social & Governance main (Navbar: Social & Governance) */}
+          {/* ESG AI Insights */}
+          <Route
+            path="/dashboard/esg"
+            element={isAuthenticated ? <Insights /> : <Navigate to="/" />}
+          />
+
+          {/* Social main */}
           <Route
             path="/dashboard/social"
             element={
@@ -91,7 +106,7 @@ function App() {
             }
           />
 
-          {/* Optional governance-specific dashboard route */}
+          {/* Governance main */}
           <Route
             path="/dashboard/governance"
             element={
@@ -99,69 +114,138 @@ function App() {
             }
           />
 
-          {/* Environmental dropdown routes (from Navbar: Environmental > ...) */}
+          {/* Governance sub-pages (match Navbar governanceLinks) */}
+          <Route
+            path="/dashboard/governance/corporate"
+            element={
+              isAuthenticated ? (
+                <CorporateGovernance />
+              ) : (
+                <Navigate to="/" />
+              )
+            }
+          />
+          <Route
+            path="/dashboard/governance/ethic"
+            element={
+              isAuthenticated ? (
+                <EthicsCompliance />
+              ) : (
+                <Navigate to="/" />
+              )
+            }
+          />
+          <Route
+            path="/dashboard/governance/data"
+            element={
+              isAuthenticated ? (
+                <DataPrivacySecurity />
+              ) : (
+                <Navigate to="/" />
+              )
+            }
+          />
+          <Route
+            path="/dashboard/governance/supply"
+            element={
+              isAuthenticated ? (
+                <SupplyChainGovernance />
+              ) : (
+                <Navigate to="/" />
+              )
+            }
+          />
+
+          {/* Environmental landing */}
+          <Route
+            path="/dashboard/environment"
+            element={
+              isAuthenticated ? (
+                <EnvironmentalCategory />
+              ) : (
+                <Navigate to="/" />
+              )
+            }
+          />
+
+          {/* Environmental sub-pages */}
           <Route
             path="/dashboard/environment/energy"
             element={isAuthenticated ? <Energy /> : <Navigate to="/" />}
           />
-
           <Route
             path="/dashboard/environment/carbon"
             element={isAuthenticated ? <Carbon /> : <Navigate to="/" />}
           />
-
           <Route
             path="/dashboard/environment/water"
             element={isAuthenticated ? <Water /> : <Navigate to="/" />}
           />
-
           <Route
             path="/dashboard/environment/waste"
             element={isAuthenticated ? <Waste /> : <Navigate to="/" />}
           />
-
           <Route
             path="/dashboard/environment/coal"
             element={isAuthenticated ? <Coal /> : <Navigate to="/" />}
           />
 
-          {/* Legacy/simple routes – keep if still used elsewhere */}
+          {/* Legacy/simple routes – optional, can keep or remove */}
           <Route
             path="/environmental"
             element={
-              isAuthenticated ? <EnvironmentalCategory /> : <Navigate to="/" />
+              isAuthenticated ? (
+                <EnvironmentalCategory />
+              ) : (
+                <Navigate to="/" />
+              )
             }
           />
-
           <Route
             path="/social"
             element={
               isAuthenticated ? <SocialCategory /> : <Navigate to="/" />
             }
           />
-
           <Route
             path="/governance"
             element={
               isAuthenticated ? <GovernanceCategory /> : <Navigate to="/" />
             }
           />
-
-          {/* Map /carbon to the new Carbon page as well */}
           <Route
-            path="/carbon"
+            path="/governance/corporate"
+            element={
+              isAuthenticated ? (
+                <CorporateGovernance />
+              ) : (
+                <Navigate to="/" />
+              )
+            }
+          />
+          <Route
+            path="/governance/carbon"
             element={isAuthenticated ? <Carbon /> : <Navigate to="/" />}
           />
-
-          {/* Reuse the same Energy page for the old /energy route */}
           <Route
-            path="/energy"
+            path="/governance/energy"
             element={isAuthenticated ? <Energy /> : <Navigate to="/" />}
           />
-
           <Route
-            path="/insights"
+            path="/governance/insights"
             element={isAuthenticated ? <Insights /> : <Navigate to="/" />}
+          />
+
+          {/* Catch-all */}
+          <Route
+            path="*"
+            element={
+              isAuthenticated ? (
+                <Navigate to="/dashboard" />
+              ) : (
+                <Navigate to="/" />
+              )
+            }
           />
         </Routes>
       </Router>

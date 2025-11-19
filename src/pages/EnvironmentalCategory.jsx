@@ -1,3 +1,4 @@
+// src/pages/EnvironmentalCategory.jsx
 import React, { useContext } from "react";
 import { Pie, Bar } from "react-chartjs-2";
 import {
@@ -26,8 +27,22 @@ const EnvironmentalCategory = () => {
   const { environmentalMetrics, environmentalInsights, loading } =
     useContext(SimulationContext);
 
+  // derive labels from series length
+  const periods =
+    environmentalMetrics?.energyUsage &&
+    environmentalMetrics.energyUsage.length > 0
+      ? environmentalMetrics.energyUsage.map((_, idx) => `Period ${idx + 1}`)
+      : ["Period 1", "Period 2", "Period 3", "Period 4"];
+
+  const wasteLabels =
+    environmentalMetrics?.waste &&
+    environmentalMetrics.waste.length > 0 &&
+    environmentalMetrics.waste.length === periods.length
+      ? periods
+      : ["Stream 1", "Stream 2", "Stream 3", "Stream 4"];
+
   const energyData = {
-    labels: ["Solar", "Diesel", "Electricity", "Coal"],
+    labels: periods,
     datasets: [
       {
         data: environmentalMetrics?.energyUsage || [50, 30, 10, 10],
@@ -38,11 +53,11 @@ const EnvironmentalCategory = () => {
   };
 
   const emissionsData = {
-    labels: ["Coal", "Electricity", "Diesel", "Solar"],
+    labels: periods,
     datasets: [
       {
         label: "Carbon Emissions (tCO₂e)",
-        data: environmentalMetrics?.emissions || [100, 80, 50, 20],
+        data: environmentalMetrics?.co2Emissions || [100, 80, 50, 20],
         backgroundColor: "#16a34a",
         borderRadius: 4,
         barThickness: 16,
@@ -51,7 +66,7 @@ const EnvironmentalCategory = () => {
   };
 
   const wasteData = {
-    labels: ["Plastic", "Food", "Toxic Liquids", "General"],
+    labels: wasteLabels,
     datasets: [
       {
         label: "Waste (tonnes)",
@@ -63,10 +78,7 @@ const EnvironmentalCategory = () => {
     ],
   };
 
-  const insights =
-    environmentalInsights && environmentalInsights.length > 0
-      ? environmentalInsights
-      : [];
+  const insights = environmentalInsights || [];
 
   const handleDownloadReport = () => {
     const doc = new jsPDF();
@@ -98,7 +110,7 @@ const EnvironmentalCategory = () => {
 
     y += 10;
     doc.setFont("helvetica", "bold");
-    doc.text("AI Mini Report:", 14, y);
+    doc.text("AI Mini Report (LIVE AI):", 14, y);
     y += 8;
 
     (insights.length > 0 ? insights : ["No AI insights available."]).forEach(
@@ -116,7 +128,6 @@ const EnvironmentalCategory = () => {
   return (
     <div className="min-h-screen bg-lime-50 py-10 font-sans flex justify-center">
       <div className="w-full max-w-7xl px-4 sm:px-6 lg:px-8">
-
         {/* Header */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
           <div>
@@ -124,17 +135,16 @@ const EnvironmentalCategory = () => {
               Environmental Performance
             </h1>
             <p className="mt-2 text-sm text-gray-600 max-w-xl">
-              Energy mix, carbon emissions and waste streams across your
-              operations, powered by AfricaESG.AI.
+              Energy intensity, emissions and waste streams across your
+              operations, powered by live AI insights from AfricaESG.AI.
             </p>
           </div>
 
-          {/* Removed Back/Forward Arrows */}
           <button
             onClick={handleDownloadReport}
             className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg shadow-md flex items-center gap-2 text-sm md:text-base font-semibold transition-transform hover:scale-105"
           >
-            <FaFilePdf className="text-white text-base md:text-lg" />{" "}
+            <FaFilePdf className="text-white text-base md:text-lg" />
             Download Report
           </button>
         </div>
@@ -145,7 +155,7 @@ const EnvironmentalCategory = () => {
           <div className="col-span-1 lg:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="bg-white p-6 rounded-2xl shadow-lg border border-gray-200">
               <h2 className="text-xl sm:text-2xl font-semibold text-gray-800 mb-4 text-center">
-                Energy Mix (MWh)
+                Energy Use by Period
               </h2>
               <div className="h-56 sm:h-64">
                 <Pie
@@ -162,7 +172,7 @@ const EnvironmentalCategory = () => {
 
             <div className="bg-white p-6 rounded-2xl shadow-lg border border-gray-200">
               <h2 className="text-xl sm:text-2xl font-semibold text-gray-800 mb-4 text-center">
-                Carbon Emissions (tCO₂e)
+                CO₂ Emissions (tCO₂e) by Period
               </h2>
               <div className="h-56 sm:h-64">
                 <Bar
@@ -203,11 +213,11 @@ const EnvironmentalCategory = () => {
           {/* AI Insights */}
           <div className="bg-white p-5 sm:p-6 rounded-2xl shadow-lg border border-gray-200 flex flex-col lg:sticky lg:top-6">
             <h2 className="text-xl font-semibold text-gray-800 mb-3">
-              AI Mini Report – Environmental
+              AI Mini Report – Environmental (LIVE)
             </h2>
 
             {loading ? (
-              <p className="text-gray-500 italic">Loading AI insights...</p>
+              <p className="text-gray-500 italic">Fetching live AI insights…</p>
             ) : insights.length > 0 ? (
               <ul className="list-disc list-inside space-y-2 text-sm sm:text-base leading-relaxed max-h-[650px] overflow-y-auto">
                 {insights.map((note, idx) => (
