@@ -19,7 +19,7 @@ import {
 } from "react-icons/fa";
 import { jsPDF } from "jspdf";
 
-const API_BASE_URL = "http://localhost:5000";
+const API_BASE_URL = "https://esg-backend-beige.vercel.app";
 
 export default function Dashboard() {
   const navigate = useNavigate();
