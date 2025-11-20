@@ -51,8 +51,9 @@ export default function Dashboard() {
   const [taxAllowances, setTaxAllowances] = useState(0);
   const [prevTaxAllowances, setPrevTaxAllowances] = useState(null);
 
-  const [carbonCredits, setPrevCarbonCredits] = useState(0);
-  const [prevCarbonCredits, setPrevPrevCarbonCredits] = useState(null);
+  // ✅ fixed names here
+  const [carbonCredits, setCarbonCredits] = useState(0);
+  const [prevCarbonCredits, setPrevCarbonCredits] = useState(null);
 
   const [energySavings, setEnergySavings] = useState(0);
   const [prevEnergySavings, setPrevEnergySavings] = useState(null);
@@ -270,12 +271,12 @@ export default function Dashboard() {
       // update KPI baselines & current values
       setPrevCarbonTax(carbonTax);
       setPrevTaxAllowances(taxAllowances);
-      setPrevPrevCarbonCredits(carbonCredits);
+      setPrevCarbonCredits(carbonCredits);
       setPrevEnergySavings(energySavings);
 
       setCarbonTax(metrics.carbonTax || 0);
       setTaxAllowances(metrics.taxAllowances || 0);
-      setPrevCarbonCredits(metrics.carbonCredits || 0);
+      setCarbonCredits(metrics.carbonCredits || 0);
       setEnergySavings(metrics.energySavings || 0);
 
       // NEW: red flags for uploaded data
@@ -346,12 +347,12 @@ export default function Dashboard() {
 
       setPrevCarbonTax(carbonTax);
       setPrevTaxAllowances(taxAllowances);
-      setPrevPrevCarbonCredits(carbonCredits);
+      setPrevCarbonCredits(carbonCredits);
       setPrevEnergySavings(energySavings);
 
       setCarbonTax(metrics.carbonTax || 0);
       setTaxAllowances(metrics.taxAllowances || 0);
-      setPrevCarbonCredits(metrics.carbonCredits || 0);
+      setCarbonCredits(metrics.carbonCredits || 0);
       setEnergySavings(metrics.energySavings || 0);
 
       const combined = Array.isArray(data.insights)
@@ -728,7 +729,7 @@ export default function Dashboard() {
               {/* Environmental card */}
               <div className="rounded-2xl border border-emerald-100 bg-emerald-50/60 p-4 h-full flex flex-col justify-between">
                 <div>
-                  <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-2">
                       <FaCloud className="text-emerald-700" />
                       <span className="text-xs font-semibold text-emerald-900 uppercase tracking-wide">
@@ -745,17 +746,29 @@ export default function Dashboard() {
                     </button>
                   </div>
                   <ul className="text-xs sm:text-sm text-emerald-900/90 space-y-1.5">
-                    <li>
-                      <span className="font-semibold">Energy</span>{" "}
-                      {extractMetric(esgSummary.environmental, "Energy")}
+                    <li className="flex items-baseline justify-between gap-2">
+                      <span className="text-[11px] font-semibold uppercase tracking-wide text-emerald-900/80">
+                        Energy
+                      </span>
+                      <span className="text-sm font-semibold text-emerald-900">
+                        {extractMetric(esgSummary.environmental, "Energy")}
+                      </span>
                     </li>
-                    <li>
-                      <span className="font-semibold">Renewables</span>{" "}
-                      {extractMetric(esgSummary.environmental, "Renewables")}
+                    <li className="flex items-baseline justify-between gap-2">
+                      <span className="text-[11px] font-semibold uppercase tracking-wide text-emerald-900/80">
+                        Renewables
+                      </span>
+                      <span className="text-sm font-semibold text-emerald-900">
+                        {extractMetric(esgSummary.environmental, "Renewables")}
+                      </span>
                     </li>
-                    <li>
-                      <span className="font-semibold">Carbon</span>{" "}
-                      {extractMetric(esgSummary.environmental, "Carbon")}
+                    <li className="flex items-baseline justify-between gap-2">
+                      <span className="text-[11px] font-semibold uppercase tracking-wide text-emerald-900/80">
+                        Carbon
+                      </span>
+                      <span className="text-sm font-semibold text-emerald-900">
+                        {extractMetric(esgSummary.environmental, "Carbon")}
+                      </span>
                     </li>
                   </ul>
                 </div>
@@ -764,7 +777,7 @@ export default function Dashboard() {
               {/* Social card */}
               <div className="rounded-2xl border border-sky-100 bg-sky-50/60 p-4 h-full flex flex-col justify-between">
                 <div>
-                  <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-2">
                       <FaUsers className="text-sky-700" />
                       <span className="text-xs font-semibold text-sky-900 uppercase tracking-wide">
@@ -779,25 +792,35 @@ export default function Dashboard() {
                     </button>
                   </div>
                   <ul className="text-xs sm:text-sm text-sky-900/90 space-y-1.5">
-                    <li>
-                      <span className="font-semibold">Supplier Diversity</span>{" "}
-                      {extractMetric(
-                        esgSummary.social,
-                        "Supplier diversity"
-                      )}
+                    <li className="flex items-baseline justify-between gap-2">
+                      <span className="text-[11px] font-semibold uppercase tracking-wide text-sky-900/80">
+                        Supplier Diversity
+                      </span>
+                      <span className="text-sm font-semibold text-sky-900">
+                        {extractMetric(
+                          esgSummary.social,
+                          "Supplier diversity"
+                        )}
+                      </span>
                     </li>
-                    <li>
-                      <span className="font-semibold">
+                    <li className="flex items-baseline justify-between gap-2">
+                      <span className="text-[11px] font-semibold uppercase tracking-wide text-sky-900/80">
                         Customer Satisfaction
-                      </span>{" "}
-                      {extractMetric(
-                        esgSummary.social,
-                        "Customer satisfaction"
-                      )}
+                      </span>
+                      <span className="text-sm font-semibold text-sky-900">
+                        {extractMetric(
+                          esgSummary.social,
+                          "Customer satisfaction"
+                        )}
+                      </span>
                     </li>
-                    <li>
-                      <span className="font-semibold">Human Capital</span>{" "}
-                      {extractMetric(esgSummary.social, "Human capital")}
+                    <li className="flex items-baseline justify-between gap-2">
+                      <span className="text-[11px] font-semibold uppercase tracking-wide text-sky-900/80">
+                        Human Capital
+                      </span>
+                      <span className="text-sm font-semibold text-sky-900">
+                        {extractMetric(esgSummary.social, "Human capital")}
+                      </span>
                     </li>
                   </ul>
                 </div>
@@ -806,7 +829,7 @@ export default function Dashboard() {
               {/* Governance card */}
               <div className="rounded-2xl border border-amber-100 bg-amber-50/60 p-4 h-full flex flex-col justify-between">
                 <div>
-                  <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-2">
                       <FaBalanceScaleLeft className="text-amber-700" />
                       <span className="text-xs font-semibold text-amber-900 uppercase tracking-wide">
@@ -823,22 +846,32 @@ export default function Dashboard() {
                     </button>
                   </div>
                   <ul className="text-xs sm:text-sm text-amber-900/90 space-y-1.5">
-                    <li>
-                      <span className="font-semibold">
+                    <li className="flex items-baseline justify-between gap-2">
+                      <span className="text-[11px] font-semibold uppercase tracking-wide text-amber-900/80">
                         Corporate Governance
-                      </span>{" "}
-                      {extractMetric(
-                        esgSummary.governance,
-                        "Corporate governance"
-                      )}
+                      </span>
+                      <span className="text-sm font-semibold text-amber-900">
+                        {extractMetric(
+                          esgSummary.governance,
+                          "Corporate governance"
+                        )}
+                      </span>
                     </li>
-                    <li>
-                      <span className="font-semibold">ISO 9001</span>{" "}
-                      {extractMetric(esgSummary.governance, "ISO 9001")}
+                    <li className="flex items-baseline justify-between gap-2">
+                      <span className="text-[11px] font-semibold uppercase tracking-wide text-amber-900/80">
+                        ISO 9001
+                      </span>
+                      <span className="text-sm font-semibold text-amber-900">
+                        {extractMetric(esgSummary.governance, "ISO 9001")}
+                      </span>
                     </li>
-                    <li>
-                      <span className="font-semibold">Business Ethics</span>{" "}
-                      {extractMetric(esgSummary.governance, "Ethics")}
+                    <li className="flex items-baseline justify-between gap-2">
+                      <span className="text-[11px] font-semibold uppercase tracking-wide text-amber-900/80">
+                        Business Ethics
+                      </span>
+                      <span className="text-sm font-semibold text-amber-900">
+                        {extractMetric(esgSummary.governance, "Ethics")}
+                      </span>
                     </li>
                   </ul>
                 </div>
