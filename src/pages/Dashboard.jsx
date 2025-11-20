@@ -19,6 +19,19 @@ import {
 } from "react-icons/fa";
 import { jsPDF } from "jspdf";
 
+// Helper: extract "label: value" from a summary string like
+// "Energy: 25,000 kWh · Renewables: 32% · Carbon: 250,000 tCO₂e"
+const extractMetric = (summaryString, label) => {
+  if (!summaryString || typeof summaryString !== "string") return "";
+
+  const parts = summaryString.split("·"); // ["Energy: ...", " Renewables: ...", ...]
+  const match = parts.find((p) => p.includes(`${label}:`));
+  if (!match) return "";
+
+  const value = match.split(`${label}:`)[1];
+  return value ? value.trim() : "";
+};
+
 const API_BASE_URL = "https://esg-backend-beige.vercel.app";
 
 export default function Dashboard() {
@@ -38,8 +51,8 @@ export default function Dashboard() {
   const [taxAllowances, setTaxAllowances] = useState(0);
   const [prevTaxAllowances, setPrevTaxAllowances] = useState(null);
 
-  const [carbonCredits, setCarbonCredits] = useState(0);
-  const [prevCarbonCredits, setPrevCarbonCredits] = useState(null);
+  const [carbonCredits, setPrevCarbonCredits] = useState(0);
+  const [prevCarbonCredits, setPrevPrevCarbonCredits] = useState(null);
 
   const [energySavings, setEnergySavings] = useState(0);
   const [prevEnergySavings, setPrevEnergySavings] = useState(null);
@@ -257,12 +270,12 @@ export default function Dashboard() {
       // update KPI baselines & current values
       setPrevCarbonTax(carbonTax);
       setPrevTaxAllowances(taxAllowances);
-      setPrevCarbonCredits(carbonCredits);
+      setPrevPrevCarbonCredits(carbonCredits);
       setPrevEnergySavings(energySavings);
 
       setCarbonTax(metrics.carbonTax || 0);
       setTaxAllowances(metrics.taxAllowances || 0);
-      setCarbonCredits(metrics.carbonCredits || 0);
+      setPrevCarbonCredits(metrics.carbonCredits || 0);
       setEnergySavings(metrics.energySavings || 0);
 
       // NEW: red flags for uploaded data
@@ -333,12 +346,12 @@ export default function Dashboard() {
 
       setPrevCarbonTax(carbonTax);
       setPrevTaxAllowances(taxAllowances);
-      setPrevCarbonCredits(carbonCredits);
+      setPrevPrevCarbonCredits(carbonCredits);
       setPrevEnergySavings(energySavings);
 
       setCarbonTax(metrics.carbonTax || 0);
       setTaxAllowances(metrics.taxAllowances || 0);
-      setCarbonCredits(metrics.carbonCredits || 0);
+      setPrevCarbonCredits(metrics.carbonCredits || 0);
       setEnergySavings(metrics.energySavings || 0);
 
       const combined = Array.isArray(data.insights)
@@ -734,27 +747,15 @@ export default function Dashboard() {
                   <ul className="text-xs sm:text-sm text-emerald-900/90 space-y-1.5">
                     <li>
                       <span className="font-semibold">Energy</span>{" "}
-                      {esgSummary.environmental.includes("Energy:")
-                        ? esgSummary.environmental
-                            .split("·")[0]
-                            .replace("Energy:", "")
-                        : ""}
+                      {extractMetric(esgSummary.environmental, "Energy")}
                     </li>
                     <li>
                       <span className="font-semibold">Renewables</span>{" "}
-                      {esgSummary.environmental.includes("Renewables:")
-                        ? esgSummary.environmental
-                            .split("·")[1]
-                            .replace("Renewables:", "")
-                        : ""}
+                      {extractMetric(esgSummary.environmental, "Renewables")}
                     </li>
                     <li>
                       <span className="font-semibold">Carbon</span>{" "}
-                      {esgSummary.environmental.includes("Carbon:")
-                        ? esgSummary.environmental
-                            .split("·")[2]
-                            .replace("Carbon:", "")
-                        : ""}
+                      {extractMetric(esgSummary.environmental, "Carbon")}
                     </li>
                   </ul>
                 </div>
@@ -780,29 +781,23 @@ export default function Dashboard() {
                   <ul className="text-xs sm:text-sm text-sky-900/90 space-y-1.5">
                     <li>
                       <span className="font-semibold">Supplier Diversity</span>{" "}
-                      {esgSummary.social.includes("Supplier")
-                        ? esgSummary.social
-                            .split("·")[0]
-                            .replace("Supplier diversity:", "")
-                        : ""}
+                      {extractMetric(
+                        esgSummary.social,
+                        "Supplier diversity"
+                      )}
                     </li>
                     <li>
                       <span className="font-semibold">
                         Customer Satisfaction
                       </span>{" "}
-                      {esgSummary.social.includes("Customer")
-                        ? esgSummary.social
-                            .split("·")[1]
-                            .replace("Customer satisfaction:", "")
-                        : ""}
+                      {extractMetric(
+                        esgSummary.social,
+                        "Customer satisfaction"
+                      )}
                     </li>
                     <li>
                       <span className="font-semibold">Human Capital</span>{" "}
-                      {esgSummary.social.includes("Human")
-                        ? esgSummary.social
-                            .split("·")[2]
-                            .replace("Human capital:", "")
-                        : ""}
+                      {extractMetric(esgSummary.social, "Human capital")}
                     </li>
                   </ul>
                 </div>
@@ -832,27 +827,18 @@ export default function Dashboard() {
                       <span className="font-semibold">
                         Corporate Governance
                       </span>{" "}
-                      {esgSummary.governance.includes("Corporate")
-                        ? esgSummary.governance
-                            .split("·")[0]
-                            .replace("Corporate governance:", "")
-                        : ""}
+                      {extractMetric(
+                        esgSummary.governance,
+                        "Corporate governance"
+                      )}
                     </li>
                     <li>
                       <span className="font-semibold">ISO 9001</span>{" "}
-                      {esgSummary.governance.includes("ISO")
-                        ? esgSummary.governance
-                            .split("·")[1]
-                            .replace(" ISO 9001:", "")
-                        : ""}
+                      {extractMetric(esgSummary.governance, "ISO 9001")}
                     </li>
                     <li>
                       <span className="font-semibold">Business Ethics</span>{" "}
-                      {esgSummary.governance.includes("Ethics")
-                        ? esgSummary.governance
-                            .split("·")[2]
-                            .replace(" Ethics:", "")
-                        : ""}
+                      {extractMetric(esgSummary.governance, "Ethics")}
                     </li>
                   </ul>
                 </div>
