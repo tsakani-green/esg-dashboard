@@ -12,7 +12,14 @@ dotenv.config();
 
 const app = express();
 app.use(express.json());
-app.use(cors());
+
+// CORS – allow all in dev, or a specific origin in prod
+const allowedOrigin = process.env.FRONTEND_ORIGIN || "*";
+app.use(
+  cors({
+    origin: allowedOrigin,
+  })
+);
 
 const PORT = process.env.PORT || 5000;
 
@@ -34,10 +41,17 @@ if (process.env.MONGO_URI) {
   console.log("No MONGO_URI provided, skipping MongoDB connection.");
 }
 
-// ---------- OpenAI client ----------
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+// ---------- OpenAI client (optional) ----------
+let openai = null;
+if (!process.env.OPENAI_API_KEY) {
+  console.warn(
+    "⚠️ No OPENAI_API_KEY found in environment. AI insights will fall back to static defaults."
+  );
+} else {
+  openai = new OpenAI({
+    apiKey: process.env.OPENAI_API_KEY,
+  });
+}
 
 // ---------- initial (demo) ESG data ----------
 const baseMockData = {
@@ -89,21 +103,20 @@ const baseMockData = {
   },
 };
 
-// this is what the whole platform uses
+// Global "current" ESG data used by the whole platform
 let currentData = baseMockData;
 let currentInsights = [];
 
 // ---------- Helpers ----------
-
 function toNumber(value) {
   if (value === null || value === undefined || value === "") return 0;
   if (typeof value === "number") return value;
-  const s = String(value).replace(",", "."); // SA decimal comma
+  const s = String(value).replace(",", "."); // decimal comma
   const n = Number(s);
   return Number.isFinite(n) ? n : 0;
 }
 
-// build ESG JSON from the Excel rows (your headers)
+// Build ESG JSON from Excel rows
 function buildEsgFromRows(rows) {
   const n = rows.length || 1;
 
@@ -183,7 +196,7 @@ function buildEsgFromRows(rows) {
       grid +
       solar +
       processGas +
-      diesel * 0.01 + // rough factors just for demo
+      diesel * 0.01 +
       lpg * 0.01;
 
     const rowCo2 =
@@ -219,7 +232,7 @@ function buildEsgFromRows(rows) {
       totalWaste: Math.round(totalWasteGen),
     },
     social: {
-      supplierDiversity: 3, // still static – you can wire real fields later
+      supplierDiversity: 3,
       customerSatisfaction: 85,
       humanCapital: 92,
       avgWomenRepresentation: Number(avgWomen.toFixed(1)),
@@ -239,7 +252,7 @@ function buildEsgFromRows(rows) {
   };
 
   const metrics = {
-    carbonTax: Math.round(totalCo2Tonnes * 150), // dummy factor
+    carbonTax: Math.round(totalCo2Tonnes * 150),
     taxAllowances: Math.round(totalEnergy * 0.05),
     carbonCredits: Math.round(totalCo2Tonnes * 0.1),
     energySavings: Math.round(totalEnergy * 0.08),
@@ -276,6 +289,11 @@ function buildEsgFromRows(rows) {
 
 // OpenAI helper
 async function generateInsightsFromOpenAI(systemPrompt, payload) {
+  if (!openai) {
+    // no key, just skip AI call
+    return [];
+  }
+
   let insights = [];
 
   try {
@@ -311,53 +329,58 @@ async function generateInsightsFromOpenAI(systemPrompt, payload) {
 
 // ---------- Routes ----------
 
-// 1) Main ESG data for dashboard / context
+// Main ESG data for dashboard
 app.get("/api/esg-data", async (req, res) => {
-  let insights = currentInsights;
+  try {
+    let insights = currentInsights;
 
-  // if no insights yet, generate once from currentData
-  if (!insights || insights.length === 0) {
-    // sensible defaults if AI fails
-    let defaultInsights = [
-      "Carbon and energy remain key drivers of the environmental footprint – prioritise high-emitting sites for efficiency and decarbonisation projects.",
-      "Use carbon tax, allowances and carbon credits as an integrated lever to manage net exposure rather than treating each in isolation.",
-      "Social performance appears stable overall; focus on improving supplier diversity and targeted skills development to support long-term resilience.",
-      "Governance structures are broadly compliant – the next step is to embed ESG KPIs into Board and EXCO scorecards for IFRS S1/S2 and JSE reporting.",
-      "Link ESG initiatives directly to value levers such as cost, risk, access to capital and brand resilience to maintain internal support.",
-    ];
+    if (!insights || insights.length === 0) {
+      let defaultInsights = [
+        "Carbon and energy remain key drivers of the environmental footprint – prioritise high-emitting sites for efficiency and decarbonisation projects.",
+        "Use carbon tax, allowances and carbon credits as an integrated lever to manage net exposure rather than treating each in isolation.",
+        "Social performance appears stable overall; focus on improving supplier diversity and targeted skills development to support long-term resilience.",
+        "Governance structures are broadly compliant – the next step is to embed ESG KPIs into Board and EXCO scorecards for IFRS S1/S2 and JSE reporting.",
+        "Link ESG initiatives directly to value levers such as cost, risk, access to capital and brand resilience to maintain internal support.",
+      ];
 
-    const systemPrompt =
-      "You are an ESG reporting advisor supporting IFRS S1/S2 and TCFD-aligned disclosures in an African context. " +
-      "Given combined ESG metrics (Environmental, Social, Governance), produce concise, executive-level insights " +
-      "suitable for inclusion in a Board pack or management commentary. " +
-      "Return 4–6 bullet points, each on its own line, without numbering.";
+      const systemPrompt =
+        "You are an ESG reporting advisor supporting IFRS S1/S2 and TCFD-aligned disclosures in an African context. " +
+        "Given combined ESG metrics (Environmental, Social, Governance), produce concise, executive-level insights " +
+        "suitable for inclusion in a Board pack or management commentary. " +
+        "Return 4–6 bullet points, each on its own line, without numbering.";
 
-    const aiInsights = await generateInsightsFromOpenAI(systemPrompt, currentData);
-    insights = aiInsights.length > 0 ? aiInsights : defaultInsights;
-    currentInsights = insights;
-  }
-
-  // optionally save run
-  if (mongoConnected) {
-    try {
-      await EsgRun.create({
-        user: req.query.user || "anonymous",
-        summary: currentData.summary,
-        metrics: currentData.metrics,
-        environmentalMetrics: currentData.environmentalMetrics,
-        socialMetrics: currentData.socialMetrics,
-        governanceMetrics: currentData.governanceMetrics,
-        insights,
-      });
-    } catch (err) {
-      console.error("MongoDB save error:", err.message);
+      const aiInsights = await generateInsightsFromOpenAI(
+        systemPrompt,
+        currentData
+      );
+      insights = aiInsights.length > 0 ? aiInsights : defaultInsights;
+      currentInsights = insights;
     }
-  }
 
-  res.json({ mockData: currentData, insights });
+    if (mongoConnected) {
+      try {
+        await EsgRun.create({
+          user: req.query.user || "anonymous",
+          summary: currentData.summary,
+          metrics: currentData.metrics,
+          environmentalMetrics: currentData.environmentalMetrics,
+          socialMetrics: currentData.socialMetrics,
+          governanceMetrics: currentData.governanceMetrics,
+          insights,
+        });
+      } catch (err) {
+        console.error("MongoDB save error:", err.message);
+      }
+    }
+
+    res.json({ mockData: currentData, insights });
+  } catch (err) {
+    console.error("Error in /api/esg-data:", err);
+    res.status(500).json({ error: "Failed to load ESG metrics and insights." });
+  }
 });
 
-// 2) Environmental-only insights (uses latest currentData)
+// Environmental-only insights
 app.get("/api/environmental-insights", async (req, res) => {
   const metrics = currentData.environmentalMetrics;
 
@@ -379,7 +402,7 @@ app.get("/api/environmental-insights", async (req, res) => {
   res.json({ metrics, insights });
 });
 
-// 3) Social-only insights
+// Social-only insights
 app.get("/api/social-insights", async (req, res) => {
   const metrics = currentData.socialMetrics;
 
@@ -401,7 +424,7 @@ app.get("/api/social-insights", async (req, res) => {
   res.json({ metrics, insights });
 });
 
-// 4) Governance-only insights
+// Governance-only insights
 app.get("/api/governance-insights", async (req, res) => {
   const metrics = currentData.governanceMetrics;
 
@@ -424,7 +447,6 @@ app.get("/api/governance-insights", async (req, res) => {
 });
 
 // ---------- Upload route (Excel OR JSON) ----------
-
 const upload = multer({ storage: multer.memoryStorage() });
 
 app.post("/api/esg-upload", upload.single("file"), async (req, res) => {
@@ -437,7 +459,6 @@ app.post("/api/esg-upload", upload.single("file"), async (req, res) => {
     let newData;
 
     if (originalName.endsWith(".json")) {
-      // JSON upload
       const jsonString = req.file.buffer.toString("utf-8");
       const parsed = JSON.parse(jsonString);
       if (!parsed.summary || !parsed.metrics) {
@@ -450,7 +471,6 @@ app.post("/api/esg-upload", upload.single("file"), async (req, res) => {
       originalName.endsWith(".xlsx") ||
       originalName.endsWith(".xls")
     ) {
-      // Excel upload – match your column headers
       const workbook = xlsx.read(req.file.buffer, { type: "buffer" });
       const sheetName = workbook.SheetNames[0];
       const sheet = workbook.Sheets[sheetName];
@@ -469,7 +489,6 @@ app.post("/api/esg-upload", upload.single("file"), async (req, res) => {
       });
     }
 
-    // Generate fresh AI insights for the uploaded data
     const systemPrompt =
       "You are an ESG reporting advisor supporting IFRS S1/S2 and TCFD-aligned disclosures in an African context. " +
       "Given combined ESG metrics (Environmental, Social, Governance), produce concise, executive-level insights. " +
@@ -487,7 +506,6 @@ app.post("/api/esg-upload", upload.single("file"), async (req, res) => {
       insights = aiInsights;
     }
 
-    // update the global "current" data so the entire platform uses it
     currentData = newData;
     currentInsights = insights;
 

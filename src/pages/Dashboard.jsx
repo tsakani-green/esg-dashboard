@@ -19,7 +19,9 @@ import {
 } from "react-icons/fa";
 import { jsPDF } from "jspdf";
 
-const API_BASE_URL = "http://localhost:5000";
+// ✅ Use env var in prod, localhost in dev
+const API_BASE_URL =
+  import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -55,15 +57,14 @@ export default function Dashboard() {
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState(null);
 
-  // keep track of latest upload events (for "Recent activity")
+  // latest uploads (for "Recent activity")
   const [recentUploads, setRecentUploads] = useState([]);
 
   // --- Red flags ---
   const [redFlags, setRedFlags] = useState([]);
 
-  // ---------- Trend indicator with better layout ----------
+  // ---------- Trend indicator ----------
   const renderIndicator = (current, previous) => {
-    // if no previous value, reserve space so card heights match
     if (previous === null || previous === undefined) {
       return <div className="h-5" />;
     }
@@ -144,7 +145,6 @@ export default function Dashboard() {
     const soc = summary?.social ?? {};
     const gov = summary?.governance ?? {};
 
-    // Example rule 1: low renewables
     const renewableShare =
       env.renewableEnergyShare !== undefined ? env.renewableEnergyShare : null;
     if (renewableShare !== null && renewableShare < 20) {
@@ -153,7 +153,6 @@ export default function Dashboard() {
       );
     }
 
-    // Example rule 2: high carbon tax exposure
     const carbonTaxValue = metrics?.carbonTax ?? 0;
     if (carbonTaxValue > 20000000) {
       flags.push(
@@ -161,7 +160,6 @@ export default function Dashboard() {
       );
     }
 
-    // Example rule 3: low energy savings relative to energy use
     const energySavingsValue = metrics?.energySavings ?? 0;
     const totalEnergy = env.totalEnergyConsumption ?? 0;
     if (totalEnergy > 0) {
@@ -175,14 +173,12 @@ export default function Dashboard() {
       }
     }
 
-    // Example rule 4: very low supplier diversity
     if (soc.supplierDiversity !== undefined && soc.supplierDiversity < 5) {
       flags.push(
         `Supplier diversity (${soc.supplierDiversity}%) is low – this may create concentration and social risk.`
       );
     }
 
-    // Example rule 5: any compliance findings (if wired into summary later)
     if (gov.totalComplianceFindings && gov.totalComplianceFindings > 0) {
       flags.push(
         `There are ${gov.totalComplianceFindings} open compliance findings – review governance actions.`
@@ -254,7 +250,6 @@ export default function Dashboard() {
           : "Data unavailable",
       });
 
-      // update KPI baselines & current values
       setPrevCarbonTax(carbonTax);
       setPrevTaxAllowances(taxAllowances);
       setPrevCarbonCredits(carbonCredits);
@@ -265,7 +260,6 @@ export default function Dashboard() {
       setCarbonCredits(metrics.carbonCredits || 0);
       setEnergySavings(metrics.energySavings || 0);
 
-      // NEW: red flags for uploaded data
       setRedFlags(computeRedFlags(summary, metrics));
 
       const backendInsights = Array.isArray(insights)
@@ -277,7 +271,6 @@ export default function Dashboard() {
 
       const now = new Date();
 
-      // Keep only latest 5 uploads + persist them
       setRecentUploads((prev) => {
         const newEntry = {
           name: file.name,
@@ -298,7 +291,6 @@ export default function Dashboard() {
         return updated;
       });
 
-      // refresh pillar-level AI mini report after upload
       await loadPillarInsights();
 
       setAiLoading(false);
@@ -320,6 +312,18 @@ export default function Dashboard() {
       setAiError(null);
 
       const res = await fetch(`${API_BASE_URL}/api/esg-data`);
+
+      if (!res.ok) {
+        let serverMessage = "";
+        try {
+          const errBody = await res.json();
+          serverMessage = errBody.error || JSON.stringify(errBody);
+        } catch {
+          serverMessage = `HTTP ${res.status} ${res.statusText}`;
+        }
+        throw new Error(serverMessage);
+      }
+
       const data = await res.json();
 
       const summary = data.mockData.summary;
@@ -348,7 +352,6 @@ export default function Dashboard() {
         : [];
       setAIInsights(combined);
 
-      // NEW: initial red flags
       setRedFlags(computeRedFlags(summary, metrics));
 
       setAiLoading(false);
@@ -374,9 +377,24 @@ export default function Dashboard() {
         fetch(`${API_BASE_URL}/api/governance-insights`),
       ]);
 
-      const envData = await envRes.json();
-      const socData = await socRes.json();
-      const govData = await govRes.json();
+      const handleRes = async (res) => {
+        if (!res.ok) {
+          let msg = "";
+          try {
+            const b = await res.json();
+            msg = b.error || JSON.stringify(b);
+          } catch {
+            msg = `HTTP ${res.status} ${res.statusText}`;
+          }
+          console.warn("Pillar insights error:", msg);
+          return { insights: [] };
+        }
+        return res.json();
+      };
+
+      const [envData, socData, govData] = await Promise.all(
+        [envRes, socRes, govRes].map(handleRes)
+      );
 
       setEnvInsights(
         Array.isArray(envData.insights) ? envData.insights.slice(0, 5) : []
@@ -389,7 +407,6 @@ export default function Dashboard() {
       );
     } catch (err) {
       console.error("Error loading pillar insights:", err);
-      // silently fall back to "No AI insights generated yet…" messages
     }
   };
 
@@ -453,7 +470,6 @@ export default function Dashboard() {
     doc.save("AfricaESG_Overview_Report.pdf");
   };
 
-  // quick helper for stat cards
   const StatCard = ({ icon, label, value, sub }) => (
     <div className="flex items-center gap-3 rounded-2xl bg-white border border-slate-100 shadow-sm px-4 py-3 h-full">
       <div className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-50 text-emerald-700 shrink-0">
@@ -471,7 +487,6 @@ export default function Dashboard() {
     </div>
   );
 
-  // MoneyCard with red-flag highlight
   const MoneyCard = ({ icon, label, value, indicator, isFlagged }) => (
     <div
       className={`rounded-2xl border shadow-sm px-4 py-3 flex flex-col justify-between gap-2 h-full ${
@@ -596,7 +611,7 @@ export default function Dashboard() {
 
         {/* ESG Summary + AI Mini Report */}
         <section className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-stretch">
-          {/* ESG Summary card (left, spanning 2 cols on desktop) */}
+          {/* ESG Summary card */}
           <div className="lg:col-span-2 h-full">
             <div className="bg-white rounded-2xl shadow-lg border border-gray-200 p-6 h-full flex flex-col">
               <div className="flex items-center gap-3 mb-2">
@@ -627,7 +642,7 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* AI Mini Report (right) */}
+          {/* AI Mini Report */}
           <div className="h-full">
             <div className="bg-white rounded-2xl shadow-lg border border-gray-200 p-6 h-full flex flex-col">
               <h2 className="text-xl font-semibold text-gray-800 mb-2">
@@ -639,7 +654,6 @@ export default function Dashboard() {
               </p>
 
               <div className="space-y-4 text-sm flex-1 overflow-y-auto pr-1">
-                {/* Environmental insights */}
                 <div>
                   <h3 className="font-semibold text-emerald-700 mb-1">
                     Environmental
@@ -657,7 +671,6 @@ export default function Dashboard() {
                   )}
                 </div>
 
-                {/* Social insights */}
                 <div>
                   <h3 className="font-semibold text-sky-700 mb-1">Social</h3>
                   {socialInsights && socialInsights.length > 0 ? (
@@ -673,7 +686,6 @@ export default function Dashboard() {
                   )}
                 </div>
 
-                {/* Governance insights */}
                 <div>
                   <h3 className="font-semibold text-amber-700 mb-1">
                     Governance
@@ -712,7 +724,6 @@ export default function Dashboard() {
 
             {/* 3 pillar mini cards */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6 items-stretch">
-              {/* Environmental card */}
               <div className="rounded-2xl border border-emerald-100 bg-emerald-50/60 p-4 h-full flex flex-col justify-between">
                 <div>
                   <div className="flex items-center justify-between mb-2">
@@ -760,7 +771,6 @@ export default function Dashboard() {
                 </div>
               </div>
 
-              {/* Social card */}
               <div className="rounded-2xl border border-sky-100 bg-sky-50/60 p-4 h-full flex flex-col justify-between">
                 <div>
                   <div className="flex items-center justify-between mb-2">
@@ -808,7 +818,6 @@ export default function Dashboard() {
                 </div>
               </div>
 
-              {/* Governance card */}
               <div className="rounded-2xl border border-amber-100 bg-amber-50/60 p-4 h-full flex flex-col justify-between">
                 <div>
                   <div className="flex items-center justify-between mb-2">
@@ -859,7 +868,7 @@ export default function Dashboard() {
               </div>
             </div>
 
-            {/* Financial / carbon KPIs row – using MoneyCard */}
+            {/* Financial / carbon KPIs row */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 items-stretch">
               <MoneyCard
                 icon={<FaIndustry size={15} />}
@@ -895,7 +904,6 @@ export default function Dashboard() {
 
         {/* Recent activity & quick navigation */}
         <section className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch">
-          {/* Recent uploads */}
           <div className="bg-white/90 backdrop-blur rounded-2xl shadow-lg border border-gray-200 p-6 h-full flex flex-col">
             <div className="flex items-center justify-between mb-3">
               <h2 className="text-base font-semibold text-gray-800">
@@ -929,7 +937,6 @@ export default function Dashboard() {
             )}
           </div>
 
-          {/* Quick navigation */}
           <div className="bg-white/90 backdrop-blur rounded-2xl shadow-lg border border-gray-200 p-6 h-full flex flex-col">
             <h2 className="text-base font-semibold text-gray-800 mb-3">
               Quick Navigation
