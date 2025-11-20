@@ -58,6 +58,9 @@ export default function Dashboard() {
   // keep track of latest upload events (for "Recent activity")
   const [recentUploads, setRecentUploads] = useState([]);
 
+  // --- Red flags ---
+  const [redFlags, setRedFlags] = useState([]);
+
   // ---------- Trend indicator with better layout ----------
   const renderIndicator = (current, previous) => {
     // if no previous value, reserve space so card heights match
@@ -133,6 +136,62 @@ export default function Dashboard() {
     );
   };
 
+  // ---------- Red flag rules ----------
+  const computeRedFlags = (summary, metrics) => {
+    const flags = [];
+
+    const env = summary?.environmental ?? {};
+    const soc = summary?.social ?? {};
+    const gov = summary?.governance ?? {};
+
+    // Example rule 1: low renewables
+    const renewableShare =
+      env.renewableEnergyShare !== undefined ? env.renewableEnergyShare : null;
+    if (renewableShare !== null && renewableShare < 20) {
+      flags.push(
+        `Renewable energy share is only ${renewableShare}%. This is below the 20% threshold.`
+      );
+    }
+
+    // Example rule 2: high carbon tax exposure
+    const carbonTaxValue = metrics?.carbonTax ?? 0;
+    if (carbonTaxValue > 20000000) {
+      flags.push(
+        `Carbon tax exposure (R ${carbonTaxValue.toLocaleString()}) is above the defined risk threshold.`
+      );
+    }
+
+    // Example rule 3: low energy savings relative to energy use
+    const energySavingsValue = metrics?.energySavings ?? 0;
+    const totalEnergy = env.totalEnergyConsumption ?? 0;
+    if (totalEnergy > 0) {
+      const savingsPct = (energySavingsValue / totalEnergy) * 100;
+      if (savingsPct < 5) {
+        flags.push(
+          `Energy savings represent only ${savingsPct.toFixed(
+            1
+          )}% of total energy use – consider additional efficiency projects.`
+        );
+      }
+    }
+
+    // Example rule 4: very low supplier diversity
+    if (soc.supplierDiversity !== undefined && soc.supplierDiversity < 5) {
+      flags.push(
+        `Supplier diversity (${soc.supplierDiversity}%) is low – this may create concentration and social risk.`
+      );
+    }
+
+    // Example rule 5: any compliance findings (if wired into summary later)
+    if (gov.totalComplianceFindings && gov.totalComplianceFindings > 0) {
+      flags.push(
+        `There are ${gov.totalComplianceFindings} open compliance findings – review governance actions.`
+      );
+    }
+
+    return flags;
+  };
+
   // ---- upload handler (Excel + JSON) ----
   const handleUpload = async (file) => {
     if (!file) return;
@@ -205,6 +264,9 @@ export default function Dashboard() {
       setTaxAllowances(metrics.taxAllowances || 0);
       setCarbonCredits(metrics.carbonCredits || 0);
       setEnergySavings(metrics.energySavings || 0);
+
+      // NEW: red flags for uploaded data
+      setRedFlags(computeRedFlags(summary, metrics));
 
       const backendInsights = Array.isArray(insights)
         ? insights
@@ -286,6 +348,9 @@ export default function Dashboard() {
         : [];
       setAIInsights(combined);
 
+      // NEW: initial red flags
+      setRedFlags(computeRedFlags(summary, metrics));
+
       setAiLoading(false);
     } catch (err) {
       console.error("Error fetching ESG data:", err);
@@ -324,6 +389,7 @@ export default function Dashboard() {
       );
     } catch (err) {
       console.error("Error loading pillar insights:", err);
+      // silently fall back to "No AI insights generated yet…" messages
     }
   };
 
@@ -405,9 +471,13 @@ export default function Dashboard() {
     </div>
   );
 
-  // MoneyCard with better currency layout + fixed indicator alignment
-  const MoneyCard = ({ icon, label, value, indicator }) => (
-    <div className="rounded-2xl bg-white border border-slate-100 shadow-sm px-4 py-3 flex flex-col justify-between gap-2 h-full">
+  // MoneyCard with red-flag highlight
+  const MoneyCard = ({ icon, label, value, indicator, isFlagged }) => (
+    <div
+      className={`rounded-2xl border shadow-sm px-4 py-3 flex flex-col justify-between gap-2 h-full ${
+        isFlagged ? "bg-red-50 border-red-300" : "bg-white border-slate-100"
+      }`}
+    >
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           <span className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-50 text-emerald-700 shrink-0">
@@ -479,23 +549,68 @@ export default function Dashboard() {
           </div>
         </header>
 
-        {/* ESG Summary + AI Mini Report + ESG Performance Overview */}
-        <section className="grid grid-cols-1 xl:grid-cols-3 gap-6 items-stretch">
-          {/* Left column: ESG Summary + AI Mini stacked */}
-          <div className="flex flex-col gap-4 h-full">
-            {/* Smaller ESG Summary card */}
-            <div className="bg-white rounded-2xl shadow-md border border-gray-200 px-4 py-3 flex flex-col">
-              <div className="flex items-center gap-2 mb-1">
-                <FaLeaf className="text-green-700 text-lg" />
-                <h2 className="text-lg font-semibold text-gray-800">
+        {/* Red Flag Panel */}
+        {redFlags.length > 0 && (
+          <section className="bg-red-50 border border-red-200 rounded-2xl px-4 py-3 flex gap-3 items-start">
+            <FaExclamationTriangle className="text-red-500 mt-1 shrink-0" />
+            <div>
+              <h2 className="text-sm font-semibold text-red-800 mb-1">
+                Red Flags Detected
+              </h2>
+              <ul className="list-disc list-inside text-xs sm:text-sm text-red-900 space-y-1">
+                {redFlags.map((flag, idx) => (
+                  <li key={idx}>{flag}</li>
+                ))}
+              </ul>
+            </div>
+          </section>
+        )}
+
+        {/* Headline stats row */}
+        <section className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 items-stretch">
+          <StatCard
+            icon={<FaGlobeAfrica size={18} />}
+            label="African countries supported"
+            value="50+"
+            sub="Regional ESG coverage"
+          />
+          <StatCard
+            icon={<FaFileAlt size={18} />}
+            label="ESG reports generated"
+            value="10k+"
+            sub="Automated & AI-assisted"
+          />
+          <StatCard
+            icon={<FaShieldAlt size={18} />}
+            label="Compliance accuracy"
+            value="99%"
+            sub="Templates for IFRS, GRI, JSE"
+          />
+          <StatCard
+            icon={<FaRobot size={18} />}
+            label="AI analyst support"
+            value="24/7"
+            sub="Continuous ESG monitoring"
+          />
+        </section>
+
+        {/* ESG Summary + AI Mini Report */}
+        <section className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-stretch">
+          {/* ESG Summary card (left, spanning 2 cols on desktop) */}
+          <div className="lg:col-span-2 h-full">
+            <div className="bg-white rounded-2xl shadow-lg border border-gray-200 p-6 h-full flex flex-col">
+              <div className="flex items-center gap-3 mb-2">
+                <FaLeaf className="text-green-700 text-xl" />
+                <h2 className="text-xl sm:text-2xl font-semibold text-gray-800">
                   ESG Summary
                 </h2>
               </div>
-              <p className="text-xs text-gray-600 mb-2">
-                Snapshot from the latest uploaded dataset.
+              <p className="text-sm text-gray-600 mb-4">
+                High-level ESG performance snapshot from the latest uploaded
+                dataset.
               </p>
 
-              <div className="space-y-1.5 text-xs text-gray-800">
+              <div className="space-y-2 text-sm text-gray-800 mt-auto">
                 <p>
                   <span className="font-semibold">Environmental:</span>{" "}
                   {esgSummary.environmental}
@@ -510,31 +625,33 @@ export default function Dashboard() {
                 </p>
               </div>
             </div>
+          </div>
 
-            {/* AI Mini Report card */}
-            <div className="bg-white rounded-2xl shadow-md border border-gray-200 p-4 flex flex-col flex-1">
-              <h2 className="text-base font-semibold text-gray-800 mb-1">
+          {/* AI Mini Report (right) */}
+          <div className="h-full">
+            <div className="bg-white rounded-2xl shadow-lg border border-gray-200 p-6 h-full flex flex-col">
+              <h2 className="text-xl font-semibold text-gray-800 mb-2">
                 AI Mini Report on ESG Summary
               </h2>
-              <p className="text-xs text-gray-500 mb-2">
+              <p className="text-xs text-gray-500 mb-3">
                 AI-generated commentary on Environmental, Social and Governance
                 performance based on the latest ESG upload.
               </p>
 
-              <div className="space-y-3 text-xs flex-1 overflow-y-auto pr-1">
+              <div className="space-y-4 text-sm flex-1 overflow-y-auto pr-1">
                 {/* Environmental insights */}
                 <div>
                   <h3 className="font-semibold text-emerald-700 mb-1">
                     Environmental
                   </h3>
                   {envInsights && envInsights.length > 0 ? (
-                    <ul className="list-disc list-inside text-gray-700 space-y-0.5">
+                    <ul className="list-disc list-inside text-gray-700 space-y-1">
                       {envInsights.map((i, idx) => (
                         <li key={idx}>{i}</li>
                       ))}
                     </ul>
                   ) : (
-                    <p className="text-[11px] text-gray-500">
+                    <p className="text-xs text-gray-500">
                       No AI insights generated yet for Environmental.
                     </p>
                   )}
@@ -544,13 +661,13 @@ export default function Dashboard() {
                 <div>
                   <h3 className="font-semibold text-sky-700 mb-1">Social</h3>
                   {socialInsights && socialInsights.length > 0 ? (
-                    <ul className="list-disc list-inside text-gray-700 space-y-0.5">
+                    <ul className="list-disc list-inside text-gray-700 space-y-1">
                       {socialInsights.map((i, idx) => (
                         <li key={idx}>{i}</li>
                       ))}
                     </ul>
                   ) : (
-                    <p className="text-[11px] text-gray-500">
+                    <p className="text-xs text-gray-500">
                       No AI insights generated yet for Social.
                     </p>
                   )}
@@ -562,13 +679,13 @@ export default function Dashboard() {
                     Governance
                   </h3>
                   {govInsights && govInsights.length > 0 ? (
-                    <ul className="list-disc list-inside text-gray-700 space-y-0.5">
+                    <ul className="list-disc list-inside text-gray-700 space-y-1">
                       {govInsights.map((i, idx) => (
                         <li key={idx}>{i}</li>
                       ))}
                     </ul>
                   ) : (
-                    <p className="text-[11px] text-gray-500">
+                    <p className="text-xs text-gray-500">
                       No AI insights generated yet for Governance.
                     </p>
                   )}
@@ -576,314 +693,276 @@ export default function Dashboard() {
               </div>
             </div>
           </div>
+        </section>
 
-          {/* Right side: ESG Performance Overview (spans 2 cols on desktop) */}
-          <div className="xl:col-span-2 h-full">
-            <div className="bg-white rounded-2xl shadow-lg border border-gray-200 p-6 h-full flex flex-col">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-xl sm:text-2xl font-semibold text-gray-800">
-                  ESG Performance Overview
-                </h2>
-                <button
-                  className="text-xs text-emerald-600 hover:text-emerald-800 font-medium"
-                  onClick={() => navigate("/environmental")}
-                >
-                  View detailed ESG metrics →
-                </button>
-              </div>
+        {/* ESG Performance Overview */}
+        <section>
+          <div className="bg-white rounded-2xl shadow-lg border border-gray-200 p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl sm:text-2xl font-semibold text-gray-800">
+                ESG Performance Overview
+              </h2>
+              <button
+                className="text-xs text-emerald-600 hover:text-emerald-800 font-medium"
+                onClick={() => navigate("/environmental")}
+              >
+                View detailed ESG metrics →
+              </button>
+            </div>
 
-              {/* 3 pillar mini cards */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6 items-stretch">
-                {/* Environmental card */}
-                <div className="rounded-2xl border border-emerald-100 bg-emerald-50/60 p-4 h-full flex flex-col justify-between">
-                  <div>
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="flex items-center gap-2">
-                        <FaCloud className="text-emerald-700" />
-                        <span className="text-xs font-semibold text-emerald-900 uppercase tracking-wide">
-                          Environmental
-                        </span>
-                      </div>
-                      <button
-                        className="text-[11px] text-emerald-700 font-semibold hover:underline"
-                        onClick={() =>
-                          navigate("/dashboard/environment/energy")
-                        }
-                      >
-                        View details
-                      </button>
+            {/* 3 pillar mini cards */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6 items-stretch">
+              {/* Environmental card */}
+              <div className="rounded-2xl border border-emerald-100 bg-emerald-50/60 p-4 h-full flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <FaCloud className="text-emerald-700" />
+                      <span className="text-xs font-semibold text-emerald-900 uppercase tracking-wide">
+                        Environmental
+                      </span>
                     </div>
-                    <ul className="text-xs sm:text-sm text-emerald-900/90 space-y-1.5">
-                      <li>
-                        <span className="font-semibold">Energy</span>{" "}
-                        {esgSummary.environmental.includes("Energy:")
-                          ? esgSummary.environmental
-                              .split("·")[0]
-                              .replace("Energy:", "")
-                          : ""}
-                      </li>
-                      <li>
-                        <span className="font-semibold">Renewables</span>{" "}
-                        {esgSummary.environmental.includes("Renewables:")
-                          ? esgSummary.environmental
-                              .split("·")[1]
-                              .replace("Renewables:", "")
-                          : ""}
-                      </li>
-                      <li>
-                        <span className="font-semibold">Carbon</span>{" "}
-                        {esgSummary.environmental.includes("Carbon:")
-                          ? esgSummary.environmental
-                              .split("·")[2]
-                              .replace("Carbon:", "")
-                          : ""}
-                      </li>
-                    </ul>
+                    <button
+                      className="text-[11px] text-emerald-700 font-semibold hover:underline"
+                      onClick={() =>
+                        navigate("/dashboard/environment/energy")
+                      }
+                    >
+                      View details
+                    </button>
                   </div>
-                </div>
-
-                {/* Social card */}
-                <div className="rounded-2xl border border-sky-100 bg-sky-50/60 p-4 h-full flex flex-col justify-between">
-                  <div>
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="flex items-center gap-2">
-                        <FaUsers className="text-sky-700" />
-                        <span className="text-xs font-semibold text-sky-900 uppercase tracking-wide">
-                          Social
-                        </span>
-                      </div>
-                      <button
-                        className="text-[11px] text-sky-700 font-semibold hover:underline"
-                        onClick={() => navigate("/dashboard/social")}
-                      >
-                        View details
-                      </button>
-                    </div>
-                    <ul className="text-xs sm:text-sm text-sky-900/90 space-y-1.5">
-                      <li>
-                        <span className="font-semibold">
-                          Supplier Diversity
-                        </span>{" "}
-                        {esgSummary.social.includes("Supplier")
-                          ? esgSummary.social
-                              .split("·")[0]
-                              .replace("Supplier diversity:", "")
-                          : ""}
-                      </li>
-                      <li>
-                        <span className="font-semibold">
-                          Customer Satisfaction
-                        </span>{" "}
-                        {esgSummary.social.includes("Customer")
-                          ? esgSummary.social
-                              .split("·")[1]
-                              .replace("Customer satisfaction:", "")
-                          : ""}
-                      </li>
-                      <li>
-                        <span className="font-semibold">Human Capital</span>{" "}
-                        {esgSummary.social.includes("Human")
-                          ? esgSummary.social
-                              .split("·")[2]
-                              .replace("Human capital:", "")
-                          : ""}
-                      </li>
-                    </ul>
-                  </div>
-                </div>
-
-                {/* Governance card */}
-                <div className="rounded-2xl border border-amber-100 bg-amber-50/60 p-4 h-full flex flex-col justify-between">
-                  <div>
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="flex items-center gap-2">
-                        <FaBalanceScaleLeft className="text-amber-700" />
-                        <span className="text-xs font-semibold text-amber-900 uppercase tracking-wide">
-                          Governance
-                        </span>
-                      </div>
-                      <button
-                        className="text-[11px] text-amber-700 font-semibold hover:underline"
-                        onClick={() =>
-                          navigate("/dashboard/governance/corporate")
-                        }
-                      >
-                        View details
-                      </button>
-                    </div>
-                    <ul className="text-xs sm:text-sm text-amber-900/90 space-y-1.5">
-                      <li>
-                        <span className="font-semibold">
-                          Corporate Governance
-                        </span>{" "}
-                        {esgSummary.governance.includes("Corporate")
-                          ? esgSummary.governance
-                              .split("·")[0]
-                              .replace("Corporate governance:", "")
-                          : ""}
-                      </li>
-                      <li>
-                        <span className="font-semibold">ISO 9001</span>{" "}
-                        {esgSummary.governance.includes("ISO")
-                          ? esgSummary.governance
-                              .split("·")[1]
-                              .replace(" ISO 9001:", "")
-                          : ""}
-                      </li>
-                      <li>
-                        <span className="font-semibold">Business Ethics</span>{" "}
-                        {esgSummary.governance.includes("Ethics")
-                          ? esgSummary.governance
-                              .split("·")[2]
-                              .replace(" Ethics:", "")
-                          : ""}
-                      </li>
-                    </ul>
-                  </div>
+                  <ul className="text-xs sm:text-sm text-emerald-900/90 space-y-1.5">
+                    <li>
+                      <span className="font-semibold">Energy</span>{" "}
+                      {esgSummary.environmental.includes("Energy:")
+                        ? esgSummary.environmental
+                            .split("·")[0]
+                            .replace("Energy:", "")
+                        : ""}
+                    </li>
+                    <li>
+                      <span className="font-semibold">Renewables</span>{" "}
+                      {esgSummary.environmental.includes("Renewables:")
+                        ? esgSummary.environmental
+                            .split("·")[1]
+                            .replace("Renewables:", "")
+                        : ""}
+                    </li>
+                    <li>
+                      <span className="font-semibold">Carbon</span>{" "}
+                      {esgSummary.environmental.includes("Carbon:")
+                        ? esgSummary.environmental
+                            .split("·")[2]
+                            .replace("Carbon:", "")
+                        : ""}
+                    </li>
+                  </ul>
                 </div>
               </div>
 
-              {/* Financial / carbon KPIs row – using MoneyCard */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 items-stretch mt-auto">
-                <MoneyCard
-                  icon={<FaIndustry size={15} />}
-                  label="Carbon Tax (2024/2025)"
-                  value={`R ${carbonTax.toLocaleString()}`}
-                  indicator={renderIndicator(carbonTax, prevCarbonTax)}
-                />
-                <MoneyCard
-                  icon={<FaCloud size={15} />}
-                  label="Applicable Tax Allowances"
-                  value={`R ${taxAllowances.toLocaleString()}`}
-                  indicator={renderIndicator(
-                    taxAllowances,
-                    prevTaxAllowances
-                  )}
-                />
-                <MoneyCard
-                  icon={<FaTrash size={15} />}
-                  label="Carbon Credits Generated"
-                  value={`${carbonCredits.toLocaleString()} tonnes`}
-                  indicator={renderIndicator(
-                    carbonCredits,
-                    prevCarbonCredits
-                  )}
-                />
-                <MoneyCard
-                  icon={<FaTint size={15} />}
-                  label="Energy Savings"
-                  value={`${energySavings.toLocaleString()} kWh`}
-                  indicator={renderIndicator(
-                    energySavings,
-                    prevEnergySavings
-                  )}
-                />
+              {/* Social card */}
+              <div className="rounded-2xl border border-sky-100 bg-sky-50/60 p-4 h-full flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <FaUsers className="text-sky-700" />
+                      <span className="text-xs font-semibold text-sky-900 uppercase tracking-wide">
+                        Social
+                      </span>
+                    </div>
+                    <button
+                      className="text-[11px] text-sky-700 font-semibold hover:underline"
+                      onClick={() => navigate("/dashboard/social")}
+                    >
+                      View details
+                    </button>
+                  </div>
+                  <ul className="text-xs sm:text-sm text-sky-900/90 space-y-1.5">
+                    <li>
+                      <span className="font-semibold">Supplier Diversity</span>{" "}
+                      {esgSummary.social.includes("Supplier")
+                        ? esgSummary.social
+                            .split("·")[0]
+                            .replace("Supplier diversity:", "")
+                        : ""}
+                    </li>
+                    <li>
+                      <span className="font-semibold">
+                        Customer Satisfaction
+                      </span>{" "}
+                      {esgSummary.social.includes("Customer")
+                        ? esgSummary.social
+                            .split("·")[1]
+                            .replace("Customer satisfaction:", "")
+                        : ""}
+                    </li>
+                    <li>
+                      <span className="font-semibold">Human Capital</span>{" "}
+                      {esgSummary.social.includes("Human")
+                        ? esgSummary.social
+                            .split("·")[2]
+                            .replace("Human capital:", "")
+                        : ""}
+                    </li>
+                  </ul>
+                </div>
               </div>
+
+              {/* Governance card */}
+              <div className="rounded-2xl border border-amber-100 bg-amber-50/60 p-4 h-full flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <FaBalanceScaleLeft className="text-amber-700" />
+                      <span className="text-xs font-semibold text-amber-900 uppercase tracking-wide">
+                        Governance
+                      </span>
+                    </div>
+                    <button
+                      className="text-[11px] text-amber-700 font-semibold hover:underline"
+                      onClick={() =>
+                        navigate("/dashboard/governance/corporate")
+                      }
+                    >
+                      View details
+                    </button>
+                  </div>
+                  <ul className="text-xs sm:text-sm text-amber-900/90 space-y-1.5">
+                    <li>
+                      <span className="font-semibold">
+                        Corporate Governance
+                      </span>{" "}
+                      {esgSummary.governance.includes("Corporate")
+                        ? esgSummary.governance
+                            .split("·")[0]
+                            .replace("Corporate governance:", "")
+                        : ""}
+                    </li>
+                    <li>
+                      <span className="font-semibold">ISO 9001</span>{" "}
+                      {esgSummary.governance.includes("ISO")
+                        ? esgSummary.governance
+                            .split("·")[1]
+                            .replace(" ISO 9001:", "")
+                        : ""}
+                    </li>
+                    <li>
+                      <span className="font-semibold">Business Ethics</span>{" "}
+                      {esgSummary.governance.includes("Ethics")
+                        ? esgSummary.governance
+                            .split("·")[2]
+                            .replace(" Ethics:", "")
+                        : ""}
+                    </li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+
+            {/* Financial / carbon KPIs row – using MoneyCard */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 items-stretch">
+              <MoneyCard
+                icon={<FaIndustry size={15} />}
+                label="Carbon Tax (2024/2025)"
+                value={`R ${carbonTax.toLocaleString()}`}
+                indicator={renderIndicator(carbonTax, prevCarbonTax)}
+                isFlagged={carbonTax > 20000000}
+              />
+              <MoneyCard
+                icon={<FaCloud size={15} />}
+                label="Applicable Tax Allowances"
+                value={`R ${taxAllowances.toLocaleString()}`}
+                indicator={renderIndicator(taxAllowances, prevTaxAllowances)}
+                isFlagged={false}
+              />
+              <MoneyCard
+                icon={<FaTrash size={15} />}
+                label="Carbon Credits Generated"
+                value={`${carbonCredits.toLocaleString()} tonnes`}
+                indicator={renderIndicator(carbonCredits, prevCarbonCredits)}
+                isFlagged={false}
+              />
+              <MoneyCard
+                icon={<FaTint size={15} />}
+                label="Energy Savings"
+                value={`${energySavings.toLocaleString()} kWh`}
+                indicator={renderIndicator(energySavings, prevEnergySavings)}
+                isFlagged={false}
+              />
             </div>
           </div>
         </section>
 
-        {/* Headline stats + Recent activity & quick navigation */}
-        <section className="space-y-6">
-          {/* Headline stats row NOW directly above Recent/Quick */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 items-stretch">
-            <StatCard
-              icon={<FaGlobeAfrica size={18} />}
-              label="African countries supported"
-              value="50+"
-              sub="Regional ESG coverage"
-            />
-            <StatCard
-              icon={<FaFileAlt size={18} />}
-              label="ESG reports generated"
-              value="10k+"
-              sub="Automated & AI-assisted"
-            />
-            <StatCard
-              icon={<FaShieldAlt size={18} />}
-              label="Compliance accuracy"
-              value="99%"
-              sub="Templates for IFRS, GRI, JSE"
-            />
-            <StatCard
-              icon={<FaRobot size={18} />}
-              label="AI analyst support"
-              value="24/7"
-              sub="Continuous ESG monitoring"
-            />
-          </div>
-
-          {/* Recent activity & quick navigation, aligned under the stats */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch">
-            {/* Recent uploads */}
-            <div className="bg-white/90 backdrop-blur rounded-2xl shadow-lg border border-gray-200 p-6 h-full flex flex-col">
-              <div className="flex items-center justify-between mb-3">
-                <h2 className="text-base font-semibold text-gray-800">
-                  Recent ESG Data Uploads
-                </h2>
-                <span className="text-xs text-slate-500">Latest 5 uploads</span>
-              </div>
-
-              {recentUploads.length === 0 ? (
-                <p className="text-sm text-slate-500">
-                  No uploads recorded yet. Upload an Excel or JSON ESG dataset
-                  to see activity here.
-                </p>
-              ) : (
-                <ul className="divide-y divide-slate-100 text-sm text-slate-700">
-                  {recentUploads.slice(0, 5).map((item, idx) => (
-                    <li
-                      key={idx}
-                      className="py-2 flex items-center justify-between"
-                    >
-                      <div>
-                        <div className="font-medium">{item.name}</div>
-                        <div className="text-xs text-slate-500">
-                          {item.type} · {item.status}
-                        </div>
-                      </div>
-                      <div className="text-xs text-slate-400">{item.time}</div>
-                    </li>
-                  ))}
-                </ul>
-              )}
+        {/* Recent activity & quick navigation */}
+        <section className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch">
+          {/* Recent uploads */}
+          <div className="bg-white/90 backdrop-blur rounded-2xl shadow-lg border border-gray-200 p-6 h-full flex flex-col">
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-base font-semibold text-gray-800">
+                Recent ESG Data Uploads
+              </h2>
+              <span className="text-xs text-slate-500">Latest 5 uploads</span>
             </div>
 
-            {/* Quick navigation */}
-            <div className="bg-white/90 backdrop-blur rounded-2xl shadow-lg border border-gray-200 p-6 h-full flex flex-col">
-              <h2 className="text-base font-semibold text-gray-800 mb-3">
-                Quick Navigation
-              </h2>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm mt-1">
-                <button
-                  onClick={() => navigate("/dashboard/environment/energy")}
-                  className="flex items-center justify-between rounded-xl border border-emerald-100 bg-emerald-50/50 px-4 py-3 hover:border-emerald-300 hover:bg-emerald-50 transition-colors"
-                >
-                  <span>Environmental detail</span>
-                  <FaCloud className="text-emerald-600" />
-                </button>
-                <button
-                  onClick={() => navigate("/dashboard/governance/corporate")}
-                  className="flex items-center justify-between rounded-xl border border-amber-100 bg-amber-50/50 px-4 py-3 hover:border-amber-300 hover:bg-amber-50 transition-colors"
-                >
-                  <span>Governance detail</span>
-                  <FaBalanceScaleLeft className="text-amber-600" />
-                </button>
-                <button
-                  onClick={() => navigate("/dashboard/data-import")}
-                  className="flex items-center justify-between rounded-xl border border-sky-100 bg-sky-50/50 px-4 py-3 hover:border-sky-300 hover:bg-sky-50 transition-colors"
-                >
-                  <span>Data import workspace</span>
-                  <FaUpload className="text-sky-600" />
-                </button>
-                <button
-                  onClick={() => navigate("/dashboard/notifications")}
-                  className="flex items-center justify-between rounded-xl border border-slate-100 bg-slate-50/70 px-4 py-3 hover:border-slate-300 hover:bg-white transition-colors"
-                >
-                  <span>Alerts & notifications</span>
-                  <FaExclamationTriangle className="text-amber-500" />
-                </button>
-              </div>
+            {recentUploads.length === 0 ? (
+              <p className="text-sm text-slate-500">
+                No uploads recorded yet. Upload an Excel or JSON ESG dataset to
+                see activity here.
+              </p>
+            ) : (
+              <ul className="divide-y divide-slate-100 text-sm text-slate-700">
+                {recentUploads.slice(0, 5).map((item, idx) => (
+                  <li
+                    key={idx}
+                    className="py-2 flex items-center justify-between"
+                  >
+                    <div>
+                      <div className="font-medium">{item.name}</div>
+                      <div className="text-xs text-slate-500">
+                        {item.type} · {item.status}
+                      </div>
+                    </div>
+                    <div className="text-xs text-slate-400">{item.time}</div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+
+          {/* Quick navigation */}
+          <div className="bg-white/90 backdrop-blur rounded-2xl shadow-lg border border-gray-200 p-6 h-full flex flex-col">
+            <h2 className="text-base font-semibold text-gray-800 mb-3">
+              Quick Navigation
+            </h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm mt-1">
+              <button
+                onClick={() => navigate("/dashboard/environment/energy")}
+                className="flex items-center justify-between rounded-xl border border-emerald-100 bg-emerald-50/50 px-4 py-3 hover:border-emerald-300 hover:bg-emerald-50 transition-colors"
+              >
+                <span>Environmental detail</span>
+                <FaCloud className="text-emerald-600" />
+              </button>
+              <button
+                onClick={() => navigate("/dashboard/governance/corporate")}
+                className="flex items-center justify-between rounded-xl border border-amber-100 bg-amber-50/50 px-4 py-3 hover:border-amber-300 hover:bg-amber-50 transition-colors"
+              >
+                <span>Governance detail</span>
+                <FaBalanceScaleLeft className="text-amber-600" />
+              </button>
+              <button
+                onClick={() => navigate("/dashboard/data-import")}
+                className="flex items-center justify-between rounded-xl border border-sky-100 bg-sky-50/50 px-4 py-3 hover:border-sky-300 hover:bg-sky-50 transition-colors"
+              >
+                <span>Data import workspace</span>
+                <FaUpload className="text-sky-600" />
+              </button>
+              <button
+                onClick={() => navigate("/dashboard/notifications")}
+                className="flex items-center justify-between rounded-xl border border-slate-100 bg-slate-50/70 px-4 py-3 hover:border-slate-300 hover:bg-white transition-colors"
+              >
+                <span>Alerts & notifications</span>
+                <FaExclamationTriangle className="text-amber-500" />
+              </button>
             </div>
           </div>
         </section>
