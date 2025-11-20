@@ -317,10 +317,23 @@ app.get("/api/esg-data", async (req, res) => {
 
   // if no insights yet, generate once from currentData
   if (!insights || insights.length === 0) {
+    // sensible defaults if AI fails
+    let defaultInsights = [
+      "Carbon and energy remain key drivers of the environmental footprint – prioritise high-emitting sites for efficiency and decarbonisation projects.",
+      "Use carbon tax, allowances and carbon credits as an integrated lever to manage net exposure rather than treating each in isolation.",
+      "Social performance appears stable overall; focus on improving supplier diversity and targeted skills development to support long-term resilience.",
+      "Governance structures are broadly compliant – the next step is to embed ESG KPIs into Board and EXCO scorecards for IFRS S1/S2 and JSE reporting.",
+      "Link ESG initiatives directly to value levers such as cost, risk, access to capital and brand resilience to maintain internal support.",
+    ];
+
     const systemPrompt =
-      "You are an ESG analyst. Given combined ESG metrics (Environmental, Social, Governance), " +
-      "produce concise executive-level insights. Return 5 bullet points, each on its own line, without numbering.";
-    insights = await generateInsightsFromOpenAI(systemPrompt, currentData);
+      "You are an ESG reporting advisor supporting IFRS S1/S2 and TCFD-aligned disclosures in an African context. " +
+      "Given combined ESG metrics (Environmental, Social, Governance), produce concise, executive-level insights " +
+      "suitable for inclusion in a Board pack or management commentary. " +
+      "Return 4–6 bullet points, each on its own line, without numbering.";
+
+    const aiInsights = await generateInsightsFromOpenAI(systemPrompt, currentData);
+    insights = aiInsights.length > 0 ? aiInsights : defaultInsights;
     currentInsights = insights;
   }
 
@@ -458,18 +471,29 @@ app.post("/api/esg-upload", upload.single("file"), async (req, res) => {
 
     // Generate fresh AI insights for the uploaded data
     const systemPrompt =
-      "You are an ESG analyst. Given combined ESG metrics (Environmental, Social, Governance), " +
-      "produce concise executive-level insights. Return 5 bullet points, each on its own line, without numbering.";
+      "You are an ESG reporting advisor supporting IFRS S1/S2 and TCFD-aligned disclosures in an African context. " +
+      "Given combined ESG metrics (Environmental, Social, Governance), produce concise, executive-level insights. " +
+      "Return 4–6 bullet points, each on its own line, without numbering.";
+
+    let insights = [
+      "Initial ESG view loaded from the latest dataset – prioritise a focused review of high-emitting sites and processes.",
+      "Use this dataset to confirm carbon tax exposure and identify opportunities for additional allowances or carbon credit generation.",
+      "Assess ESG data quality and coverage and strengthen controls before finalising external reporting.",
+      "Align the key ESG metrics from this run with Board and EXCO reporting to ensure consistent messaging.",
+    ];
 
     const aiInsights = await generateInsightsFromOpenAI(systemPrompt, newData);
+    if (aiInsights.length > 0) {
+      insights = aiInsights;
+    }
 
     // update the global "current" data so the entire platform uses it
     currentData = newData;
-    currentInsights = aiInsights;
+    currentInsights = insights;
 
     res.json({
       mockData: newData,
-      insights: aiInsights,
+      insights,
     });
   } catch (err) {
     console.error("Upload processing error:", err);
