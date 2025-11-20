@@ -1,24 +1,38 @@
 // src/pages/GovernanceCategory.jsx
 import React, { useContext, useEffect, useState } from "react";
-import { FaFilePdf, FaBalanceScale, FaShieldAlt, FaUserShield, FaTruck } from "react-icons/fa";
+import {
+  FaFilePdf,
+  FaBalanceScale,
+  FaShieldAlt,
+  FaUserShield,
+  FaTruck,
+} from "react-icons/fa";
 import { jsPDF } from "jspdf";
 import { SimulationContext } from "../context/SimulationContext";
 
-const API_BASE = "http://localhost:5000";
+// ✅ Same base URL style as Dashboard
+const API_BASE_URL = "https://esg-backend-beige.vercel.app";
 
 const GovernanceCategory = () => {
-  const { governanceMetrics, governanceInsights, loading } =
+  const { governanceMetrics, governanceInsights, loading: contextLoading } =
     useContext(SimulationContext);
-
-  const insights = governanceInsights || [];
 
   // Governance summary coming directly from /api/esg-data (updated on upload)
   const [governanceSummary, setGovernanceSummary] = useState(null);
 
+  // LIVE AI governance insights from backend
+  const [liveGovInsights, setLiveGovInsights] = useState([]);
+  const [liveLoading, setLiveLoading] = useState(false);
+  const [liveError, setLiveError] = useState(null);
+
+  // Fallback if backend insights not available
+  const fallbackInsights = governanceInsights || [];
+
+  // --- Load governance summary (from /api/esg-data) ---
   useEffect(() => {
     const fetchSummary = async () => {
       try {
-        const res = await fetch(`${API_BASE}/api/esg-data`);
+        const res = await fetch(`${API_BASE_URL}/api/esg-data`);
         const data = await res.json();
         setGovernanceSummary(data?.mockData?.summary?.governance || null);
       } catch (err) {
@@ -28,6 +42,33 @@ const GovernanceCategory = () => {
     };
 
     fetchSummary();
+  }, []);
+
+  // --- Load LIVE governance insights (from /api/governance-insights) ---
+  useEffect(() => {
+    const fetchLiveGovInsights = async () => {
+      setLiveLoading(true);
+      setLiveError(null);
+
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/governance-insights`);
+        const data = await res.json();
+
+        if (Array.isArray(data.insights)) {
+          setLiveGovInsights(data.insights.slice(0, 10)); // top 10, just in case
+        } else {
+          setLiveGovInsights([]);
+        }
+      } catch (err) {
+        console.error("Live governance AI error:", err);
+        setLiveError("Failed to load live AI governance insights.");
+        setLiveGovInsights([]);
+      }
+
+      setLiveLoading(false);
+    };
+
+    fetchLiveGovInsights();
   }, []);
 
   // Helpers
@@ -196,29 +237,32 @@ const GovernanceCategory = () => {
       y += 4;
     });
 
-    // AI mini report
+    // AI mini report (prefer live, then fallback)
+    const reportInsights =
+      liveGovInsights.length > 0 ? liveGovInsights : fallbackInsights;
     y += 6;
     doc.setFont("helvetica", "bold");
-    doc.text("AI Mini Report (LIVE AI):", 14, y);
+    doc.text("AI Mini Report – Governance:", 14, y);
     y += 8;
 
-    (insights.length > 0 ? insights : ["No AI insights available."]).forEach(
-      (note) => {
-        const lines = doc.splitTextToSize(`• ${note}`, 180);
-        doc.setFont("helvetica", "normal");
-        doc.text(lines, 14, y);
-        y += lines.length * 6;
-      }
-    );
+    (reportInsights.length > 0
+      ? reportInsights
+      : ["No AI insights available."]
+    ).forEach((note) => {
+      const lines = doc.splitTextToSize(`• ${note}`, 180);
+      doc.setFont("helvetica", "normal");
+      doc.text(lines, 14, y);
+      y += lines.length * 6;
+    });
 
     doc.save("AfricaESG_GovernanceMiniReport.pdf");
   };
 
   return (
-    <div className="min-h-screen bg-lime-50 py-10 font-sans flex justify-center">
-      <div className="w-full max-w-7xl px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-lime-50 py-10 font-sans">
+      <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
         {/* Header */}
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div>
             <h1 className="text-3xl sm:text-4xl font-extrabold text-orange-900 tracking-tight">
               Governance Performance
@@ -240,7 +284,7 @@ const GovernanceCategory = () => {
         </div>
 
         {/* Main Content */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-stretch">
           {/* Governance cards grid */}
           <div className="lg:col-span-2">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
@@ -295,18 +339,35 @@ const GovernanceCategory = () => {
           {/* AI Insights – right column */}
           <div className="bg-white p-5 sm:p-6 rounded-2xl shadow-lg border border-gray-200 flex flex-col lg:sticky lg:top-6">
             <h2 className="text-xl font-semibold text-gray-800 mb-2">
-              AI Mini Report – Governance (LIVE)
+              AI Mini Report – Governance
             </h2>
             <p className="text-xs sm:text-sm text-gray-500 mb-3">
-              Live AI insights based on your latest governance, ethics, privacy
-              and supply chain metrics.
+              Live AI insights from the backend, with fallback to simulation
+              context if needed.
             </p>
 
-            {loading ? (
-              <p className="text-gray-500 italic">Fetching live AI insights…</p>
-            ) : insights.length > 0 ? (
+            {/* Loading state */}
+            {liveLoading || contextLoading ? (
+              <p className="text-gray-500 italic mb-2">
+                Fetching AI insights…
+              </p>
+            ) : null}
+
+            {/* Error state */}
+            {liveError ? (
+              <p className="text-red-500 text-sm mb-2">{liveError}</p>
+            ) : null}
+
+            {/* Insights display: prefer live API, then fallback */}
+            {liveGovInsights.length > 0 ? (
               <ul className="list-disc list-inside space-y-2 text-sm leading-relaxed max-h-[650px] overflow-y-auto">
-                {insights.map((note, idx) => (
+                {liveGovInsights.map((note, idx) => (
+                  <li key={idx}>{note}</li>
+                ))}
+              </ul>
+            ) : fallbackInsights.length > 0 ? (
+              <ul className="list-disc list-inside space-y-2 text-sm leading-relaxed max-h-[650px] overflow-y-auto">
+                {fallbackInsights.map((note, idx) => (
                   <li key={idx}>{note}</li>
                 ))}
               </ul>
