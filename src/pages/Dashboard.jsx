@@ -19,19 +19,6 @@ import {
 } from "react-icons/fa";
 import { jsPDF } from "jspdf";
 
-// Helper: extract "label: value" from a summary string like
-// "Energy: 25,000 kWh · Renewables: 32% · Carbon: 250,000 tCO₂e"
-const extractMetric = (summaryString, label) => {
-  if (!summaryString || typeof summaryString !== "string") return "";
-
-  const parts = summaryString.split("·"); // ["Energy: ...", " Renewables: ...", ...]
-  const match = parts.find((p) => p.includes(`${label}:`));
-  if (!match) return "";
-
-  const value = match.split(`${label}:`)[1];
-  return value ? value.trim() : "";
-};
-
 const API_BASE_URL = "https://esg-backend-beige.vercel.app";
 
 export default function Dashboard() {
@@ -51,7 +38,6 @@ export default function Dashboard() {
   const [taxAllowances, setTaxAllowances] = useState(0);
   const [prevTaxAllowances, setPrevTaxAllowances] = useState(null);
 
-  // ✅ fixed names here
   const [carbonCredits, setCarbonCredits] = useState(0);
   const [prevCarbonCredits, setPrevCarbonCredits] = useState(null);
 
@@ -334,7 +320,23 @@ export default function Dashboard() {
       setAiError(null);
 
       const res = await fetch(`${API_BASE_URL}/api/esg-data`);
+
+      if (!res.ok) {
+        const text = await res.text();
+        console.error(
+          "Error response from /api/esg-data:",
+          res.status,
+          text
+        );
+        throw new Error(`Backend error ${res.status}: ${text}`);
+      }
+
       const data = await res.json();
+
+      if (!data.mockData || !data.mockData.summary || !data.mockData.metrics) {
+        console.error("Invalid /api/esg-data payload:", data);
+        throw new Error("Backend returned invalid ESG data format.");
+      }
 
       const summary = data.mockData.summary;
       const metrics = data.mockData.metrics;
@@ -374,7 +376,9 @@ export default function Dashboard() {
         governance: "Data unavailable",
       });
       setAIInsights([]);
-      setAiError("Failed to load ESG metrics and AI insights.");
+      setAiError(
+        err.message || "Failed to load ESG metrics and AI insights."
+      );
       setAiLoading(false);
     }
   };
@@ -517,25 +521,6 @@ export default function Dashboard() {
     </div>
   );
 
-  // --- Derived metrics for ESG Summary tiles ---
-  const envEnergy = extractMetric(esgSummary.environmental, "Energy") || "—";
-  const envRenewables =
-    extractMetric(esgSummary.environmental, "Renewables") || "—";
-  const envCarbon = extractMetric(esgSummary.environmental, "Carbon") || "—";
-
-  const socSupplier =
-    extractMetric(esgSummary.social, "Supplier diversity") || "—";
-  const socCustomer =
-    extractMetric(esgSummary.social, "Customer satisfaction") || "—";
-  const socHuman =
-    extractMetric(esgSummary.social, "Human capital") || "—";
-
-  const govCorp =
-    extractMetric(esgSummary.governance, "Corporate governance") || "—";
-  const govISO =
-    extractMetric(esgSummary.governance, "ISO 9001") || "—";
-  const govEthics = extractMetric(esgSummary.governance, "Ethics") || "—";
-
   return (
     <div className="min-h-screen bg-lime-50 py-10 font-sans">
       <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
@@ -604,104 +589,31 @@ export default function Dashboard() {
           {/* ESG Summary card (left, spanning 2 cols on desktop) */}
           <div className="lg:col-span-2 h-full">
             <div className="bg-white rounded-2xl shadow-lg border border-gray-200 p-6 h-full flex flex-col">
-              <div className="flex items-center justify-between gap-3 mb-2">
-                <div className="flex items-center gap-3">
-                  <FaLeaf className="text-green-700 text-xl" />
-                  <div>
-                    <h2 className="text-xl sm:text-2xl font-semibold text-gray-800">
-                      ESG Summary
-                    </h2>
-                    <p className="text-xs sm:text-sm text-gray-500 mt-0.5">
-                      Condensed E, S and G view based on your latest uploaded
-                      data.
-                    </p>
-                  </div>
-                </div>
-                <span className="hidden sm:inline-flex items-center rounded-full bg-emerald-50 text-emerald-700 border border-emerald-100 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide">
-                  Latest snapshot
-                </span>
+              <div className="flex items-center gap-3 mb-2">
+                <FaLeaf className="text-green-700 text-xl" />
+                <h2 className="text-xl sm:text-2xl font-semibold text-gray-800">
+                  ESG Summary
+                </h2>
               </div>
-
-              {/* 3 compact ESG tiles */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
-                {/* Environmental tile */}
-                <div className="rounded-xl bg-gradient-to-br from-emerald-50 via-emerald-50/60 to-emerald-100/60 border border-emerald-100 p-3 flex flex-col gap-1">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="inline-flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wide text-emerald-900">
-                      <span className="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-600 text-white text-[10px]">
-                        E
-                      </span>
-                      Environmental
-                    </span>
-                    <span className="text-[11px] text-emerald-800 bg-white/60 px-2 py-0.5 rounded-full border border-emerald-100">
-                      {envRenewables !== "—"
-                        ? `${envRenewables} renewables`
-                        : "No data"}
-                    </span>
-                  </div>
-                  <div className="mt-1 text-[11px] text-emerald-900/80 space-x-1 flex flex-wrap">
-                    <span className="font-medium">{envEnergy}</span>
-                    <span>·</span>
-                    <span>{envCarbon}</span>
-                  </div>
-                </div>
-
-                {/* Social tile */}
-                <div className="rounded-xl bg-gradient-to-br from-sky-50 via-sky-50/60 to-sky-100/60 border border-sky-100 p-3 flex flex-col gap-1">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="inline-flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wide text-sky-900">
-                      <span className="flex h-5 w-5 items-center justify-center rounded-full bg-sky-600 text-white text-[10px]">
-                        S
-                      </span>
-                      Social
-                    </span>
-                    <span className="text-[11px] text-sky-800 bg-white/60 px-2 py-0.5 rounded-full border border-sky-100">
-                      {socSupplier !== "—"
-                        ? `${socSupplier} diverse spend`
-                        : "No data"}
-                    </span>
-                  </div>
-                  <div className="mt-1 text-[11px] text-sky-900/80 space-x-1 flex flex-wrap">
-                    <span className="font-medium">
-                      {socCustomer !== "—" ? `${socCustomer} CSAT` : "CSAT: —"}
-                    </span>
-                    <span>·</span>
-                    <span>
-                      {socHuman !== "—"
-                        ? `${socHuman} human capital`
-                        : "Human: —"}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Governance tile */}
-                <div className="rounded-xl bg-gradient-to-br from-amber-50 via-amber-50/60 to-amber-100/60 border border-amber-100 p-3 flex flex-col gap-1">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="inline-flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wide text-amber-900">
-                      <span className="flex h-5 w-5 items-center justify-center rounded-full bg-amber-600 text-white text-[10px]">
-                        G
-                      </span>
-                      Governance
-                    </span>
-                    <span className="text-[11px] text-amber-800 bg-white/60 px-2 py-0.5 rounded-full border border-amber-100 max-w-[120px] truncate">
-                      {govCorp}
-                    </span>
-                  </div>
-                  <div className="mt-1 text-[11px] text-amber-900/80 space-x-1 flex flex-wrap">
-                    <span className="font-medium">
-                      {govISO !== "—" ? govISO : "ISO 9001: —"}
-                    </span>
-                    <span>·</span>
-                    <span>{govEthics !== "—" ? govEthics : "Ethics: —"}</span>
-                  </div>
-                </div>
-              </div>
-
-              <p className="mt-4 text-[11px] text-slate-500">
-                Snapshot view only – use the detailed Environmental, Social and
-                Governance pages for full metric breakdowns and AI scenario
-                analysis.
+              <p className="text-sm text-gray-600 mb-4">
+                High-level ESG performance snapshot from the latest uploaded
+                dataset.
               </p>
+
+              <div className="space-y-2 text-sm text-gray-800 mt-auto">
+                <p>
+                  <span className="font-semibold">Environmental:</span>{" "}
+                  {esgSummary.environmental}
+                </p>
+                <p>
+                  <span className="font-semibold">Social:</span>{" "}
+                  {esgSummary.social}
+                </p>
+                <p>
+                  <span className="font-semibold">Governance:</span>{" "}
+                  {esgSummary.governance}
+                </p>
+              </div>
             </div>
           </div>
 
@@ -773,7 +685,7 @@ export default function Dashboard() {
           </div>
         </section>
 
-        {/* 🔁 Headline stats row MOVED here — directly before ESG Performance Overview */}
+        {/* Headline stats row */}
         <section className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 items-stretch">
           <StatCard
             icon={<FaGlobeAfrica size={18} />}
@@ -821,7 +733,7 @@ export default function Dashboard() {
               {/* Environmental card */}
               <div className="rounded-2xl border border-emerald-100 bg-emerald-50/60 p-4 h-full flex flex-col justify-between">
                 <div>
-                  <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-2">
                       <FaCloud className="text-emerald-700" />
                       <span className="text-xs font-semibold text-emerald-900 uppercase tracking-wide">
@@ -838,29 +750,29 @@ export default function Dashboard() {
                     </button>
                   </div>
                   <ul className="text-xs sm:text-sm text-emerald-900/90 space-y-1.5">
-                    <li className="flex items-baseline justify-between gap-2">
-                      <span className="text-[11px] font-semibold uppercase tracking-wide text-emerald-900/80">
-                        Energy
-                      </span>
-                      <span className="text-sm font-semibold text-emerald-900">
-                        {extractMetric(esgSummary.environmental, "Energy")}
-                      </span>
+                    <li>
+                      <span className="font-semibold">Energy</span>{" "}
+                      {esgSummary.environmental.includes("Energy:")
+                        ? esgSummary.environmental
+                            .split("·")[0]
+                            .replace("Energy:", "")
+                        : ""}
                     </li>
-                    <li className="flex items-baseline justify-between gap-2">
-                      <span className="text-[11px] font-semibold uppercase tracking-wide text-emerald-900/80">
-                        Renewables
-                      </span>
-                      <span className="text-sm font-semibold text-emerald-900">
-                        {extractMetric(esgSummary.environmental, "Renewables")}
-                      </span>
+                    <li>
+                      <span className="font-semibold">Renewables</span>{" "}
+                      {esgSummary.environmental.includes("Renewables:")
+                        ? esgSummary.environmental
+                            .split("·")[1]
+                            .replace("Renewables:", "")
+                        : ""}
                     </li>
-                    <li className="flex items-baseline justify-between gap-2">
-                      <span className="text-[11px] font-semibold uppercase tracking-wide text-emerald-900/80">
-                        Carbon
-                      </span>
-                      <span className="text-sm font-semibold text-emerald-900">
-                        {extractMetric(esgSummary.environmental, "Carbon")}
-                      </span>
+                    <li>
+                      <span className="font-semibold">Carbon</span>{" "}
+                      {esgSummary.environmental.includes("Carbon:")
+                        ? esgSummary.environmental
+                            .split("·")[2]
+                            .replace("Carbon:", "")
+                        : ""}
                     </li>
                   </ul>
                 </div>
@@ -869,7 +781,7 @@ export default function Dashboard() {
               {/* Social card */}
               <div className="rounded-2xl border border-sky-100 bg-sky-50/60 p-4 h-full flex flex-col justify-between">
                 <div>
-                  <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-2">
                       <FaUsers className="text-sky-700" />
                       <span className="text-xs font-semibold text-sky-900 uppercase tracking-wide">
@@ -884,35 +796,31 @@ export default function Dashboard() {
                     </button>
                   </div>
                   <ul className="text-xs sm:text-sm text-sky-900/90 space-y-1.5">
-                    <li className="flex items-baseline justify-between gap-2">
-                      <span className="text-[11px] font-semibold uppercase tracking-wide text-sky-900/80">
-                        Supplier Diversity
-                      </span>
-                      <span className="text-sm font-semibold text-sky-900">
-                        {extractMetric(
-                          esgSummary.social,
-                          "Supplier diversity"
-                        )}
-                      </span>
+                    <li>
+                      <span className="font-semibold">Supplier Diversity</span>{" "}
+                      {esgSummary.social.includes("Supplier")
+                        ? esgSummary.social
+                            .split("·")[0]
+                            .replace("Supplier diversity:", "")
+                        : ""}
                     </li>
-                    <li className="flex items-baseline justify-between gap-2">
-                      <span className="text-[11px] font-semibold uppercase tracking-wide text-sky-900/80">
+                    <li>
+                      <span className="font-semibold">
                         Customer Satisfaction
-                      </span>
-                      <span className="text-sm font-semibold text-sky-900">
-                        {extractMetric(
-                          esgSummary.social,
-                          "Customer satisfaction"
-                        )}
-                      </span>
+                      </span>{" "}
+                      {esgSummary.social.includes("Customer")
+                        ? esgSummary.social
+                            .split("·")[1]
+                            .replace("Customer satisfaction:", "")
+                        : ""}
                     </li>
-                    <li className="flex items-baseline justify-between gap-2">
-                      <span className="text-[11px] font-semibold uppercase tracking-wide text-sky-900/80">
-                        Human Capital
-                      </span>
-                      <span className="text-sm font-semibold text-sky-900">
-                        {extractMetric(esgSummary.social, "Human capital")}
-                      </span>
+                    <li>
+                      <span className="font-semibold">Human Capital</span>{" "}
+                      {esgSummary.social.includes("Human")
+                        ? esgSummary.social
+                            .split("·")[2]
+                            .replace("Human capital:", "")
+                        : ""}
                     </li>
                   </ul>
                 </div>
@@ -921,7 +829,7 @@ export default function Dashboard() {
               {/* Governance card */}
               <div className="rounded-2xl border border-amber-100 bg-amber-50/60 p-4 h-full flex flex-col justify-between">
                 <div>
-                  <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-2">
                       <FaBalanceScaleLeft className="text-amber-700" />
                       <span className="text-xs font-semibold text-amber-900 uppercase tracking-wide">
@@ -938,32 +846,31 @@ export default function Dashboard() {
                     </button>
                   </div>
                   <ul className="text-xs sm:text-sm text-amber-900/90 space-y-1.5">
-                    <li className="flex items-baseline justify-between gap-2">
-                      <span className="text-[11px] font-semibold uppercase tracking-wide text-amber-900/80">
+                    <li>
+                      <span className="font-semibold">
                         Corporate Governance
-                      </span>
-                      <span className="text-sm font-semibold text-amber-900">
-                        {extractMetric(
-                          esgSummary.governance,
-                          "Corporate governance"
-                        )}
-                      </span>
+                      </span>{" "}
+                      {esgSummary.governance.includes("Corporate")
+                        ? esgSummary.governance
+                            .split("·")[0]
+                            .replace("Corporate governance:", "")
+                        : ""}
                     </li>
-                    <li className="flex items-baseline justify-between gap-2">
-                      <span className="text-[11px] font-semibold uppercase tracking-wide text-amber-900/80">
-                        ISO 9001
-                      </span>
-                      <span className="text-sm font-semibold text-amber-900">
-                        {extractMetric(esgSummary.governance, "ISO 9001")}
-                      </span>
+                    <li>
+                      <span className="font-semibold">ISO 9001</span>{" "}
+                      {esgSummary.governance.includes("ISO")
+                        ? esgSummary.governance
+                            .split("·")[1]
+                            .replace(" ISO 9001:", "")
+                        : ""}
                     </li>
-                    <li className="flex items-baseline justify-between gap-2">
-                      <span className="text-[11px] font-semibold uppercase tracking-wide text-amber-900/80">
-                        Business Ethics
-                      </span>
-                      <span className="text-sm font-semibold text-amber-900">
-                        {extractMetric(esgSummary.governance, "Ethics")}
-                      </span>
+                    <li>
+                      <span className="font-semibold">Business Ethics</span>{" "}
+                      {esgSummary.governance.includes("Ethics")
+                        ? esgSummary.governance
+                            .split("·")[2]
+                            .replace(" Ethics:", "")
+                        : ""}
                     </li>
                   </ul>
                 </div>
