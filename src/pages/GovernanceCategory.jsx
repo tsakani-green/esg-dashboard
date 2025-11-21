@@ -10,7 +10,7 @@ import {
 import { jsPDF } from "jspdf";
 import { SimulationContext } from "../context/SimulationContext";
 
-// ✅ Same base URL style as Dashboard / other pages
+// Same base URL as other pages
 const API_BASE_URL = "https://esg-backend-beige.vercel.app";
 
 const GovernanceCategory = () => {
@@ -30,8 +30,25 @@ const GovernanceCategory = () => {
     const fetchSummary = async () => {
       try {
         const res = await fetch(`${API_BASE_URL}/api/esg-data`);
+
+        if (!res.ok) {
+          const text = await res.text();
+          console.error(
+            "Error response from /api/esg-data (governance summary):",
+            res.status,
+            text
+          );
+          throw new Error(`Backend error ${res.status}: ${text}`);
+        }
+
         const data = await res.json();
-        setGovernanceSummary(data?.mockData?.summary?.governance || null);
+
+        if (!data.mockData || !data.mockData.summary) {
+          console.error("Invalid /api/esg-data payload:", data);
+          throw new Error("Backend returned invalid ESG data format.");
+        }
+
+        setGovernanceSummary(data.mockData.summary.governance || null);
       } catch (err) {
         console.error("Error fetching governance summary:", err);
         setGovernanceSummary(null);
@@ -49,8 +66,15 @@ const GovernanceCategory = () => {
 
       try {
         const res = await fetch(`${API_BASE_URL}/api/governance-insights`);
+
         if (!res.ok) {
-          throw new Error(`HTTP ${res.status} ${res.statusText}`);
+          const text = await res.text();
+          console.error(
+            "Error response from /api/governance-insights:",
+            res.status,
+            text
+          );
+          throw new Error(`Backend error ${res.status}: ${text}`);
         }
 
         const data = await res.json();
@@ -60,7 +84,7 @@ const GovernanceCategory = () => {
             : [];
 
         if (incoming.length > 0) {
-          // ✅ Use real AI from backend
+          // Use real AI from backend
           setLiveGovInsights(incoming.slice(0, 10));
         } else if (Array.isArray(governanceInsights)) {
           // Fallback to context if backend returns nothing
@@ -337,7 +361,7 @@ const GovernanceCategory = () => {
           </button>
         </div>
 
-        {/* KPI summary row – matches Environmental/Social feel */}
+        {/* KPI summary row */}
         <section className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <KpiCard
             icon={<FaBalanceScale size={16} />}
@@ -438,7 +462,7 @@ const GovernanceCategory = () => {
               <p className="text-red-500 text-sm mb-2">{liveError}</p>
             ) : null}
 
-            {/* Insights display (already prefers real AI, then fallback) */}
+            {/* Insights display */}
             {liveGovInsights.length > 0 ? (
               <ul className="list-disc list-inside space-y-2 text-sm leading-relaxed max-h-[650px] overflow-y-auto">
                 {liveGovInsights.map((note, idx) => (
