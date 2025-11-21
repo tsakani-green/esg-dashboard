@@ -1,4 +1,3 @@
-// src/pages/GovernanceCategory.jsx
 import React, { useEffect, useState } from "react";
 import {
   FaFilePdf,
@@ -14,7 +13,7 @@ const API_BASE_URL = "https://esg-backend-beige.vercel.app";
 
 // --- Helper: derive simple “actions” from AI insights (similar style to Social) ---
 const deriveGovernanceActions = (insights) => {
-  const text = insights.join(" ").toLowerCase();
+  const text = (insights || []).join(" ").toLowerCase();
   const actions = new Set();
 
   if (text.includes("compliance") || text.includes("finding")) {
@@ -38,7 +37,7 @@ const deriveGovernanceActions = (insights) => {
     actions.add("Update supplier code of conduct and ESG clauses");
   }
 
-  if (actions.size === 0 && insights.length > 0) {
+  if (actions.size === 0 && insights && insights.length > 0) {
     actions.add("Translate governance insights into a 90-day action plan");
   }
 
@@ -95,43 +94,49 @@ const GovernanceCategory = () => {
     fetchSummary();
   }, []);
 
-  // --- Load LIVE governance insights (from /api/governance-insights) like Dashboard.loadPillarInsights ---
-  useEffect(() => {
-    const fetchLiveGovInsights = async () => {
-      setLiveLoading(true);
-      setLiveError(null);
+  // ---- pillar-level insights for AI mini report (adopt Dashboard's parallel fetch pattern) ----
+  const loadPillarInsights = async () => {
+    setLiveLoading(true);
+    setLiveError(null);
 
-      try {
-        const res = await fetch(`${API_BASE_URL}/api/governance-insights`);
+    try {
+      const [envRes, socRes, govRes] = await Promise.all([
+        fetch(`${API_BASE_URL}/api/environmental-insights`),
+        fetch(`${API_BASE_URL}/api/social-insights`),
+        fetch(`${API_BASE_URL}/api/governance-insights`),
+      ]);
 
-        if (!res.ok) {
-          const text = await res.text();
-          console.error(
-            "Error response from /api/governance-insights:",
-            res.status,
-            text
-          );
-          throw new Error(`Backend error ${res.status}: ${text}`);
-        }
-
-        const data = await res.json();
-        const incoming =
-          Array.isArray(data.insights) && data.insights.length > 0
-            ? data.insights
-            : [];
-
-        // ✅ Same pattern as Dashboard.jsx → slice to top N governance insights
-        setLiveGovInsights(incoming.slice(0, 10));
-      } catch (err) {
-        console.error("Live governance AI error:", err);
-        setLiveError("Failed to load live AI governance insights.");
-        setLiveGovInsights([]);
+      // If any of the responses are not ok, capture text for debugging
+      if (!envRes.ok || !socRes.ok || !govRes.ok) {
+        const errors = await Promise.all([
+          envRes.ok ? "ok" : envRes.text(),
+          socRes.ok ? "ok" : socRes.text(),
+          govRes.ok ? "ok" : govRes.text(),
+        ]);
+        console.error("Error loading pillar insights:", errors);
+        throw new Error("One or more pillar insight endpoints returned an error.");
       }
 
-      setLiveLoading(false);
-    };
+      const envData = await envRes.json();
+      const socData = await socRes.json();
+      const govData = await govRes.json();
 
-    fetchLiveGovInsights();
+      // Use governance insights from govData, fall back to empty array
+      const govArray = Array.isArray(govData.insights) ? govData.insights : [];
+      setLiveGovInsights(govArray.slice(0, 5));
+    } catch (err) {
+      console.error("Error loading governance insights (live AI):", err);
+      setLiveError("Failed to load live AI governance insights.");
+      setLiveGovInsights([]);
+    } finally {
+      setLiveLoading(false);
+    }
+  };
+
+  // initial load of pillar insights (so GovernanceCategory uses the same AI source as Dashboard)
+  useEffect(() => {
+    loadPillarInsights();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // ------- Helpers -------
