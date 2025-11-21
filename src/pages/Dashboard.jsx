@@ -27,12 +27,10 @@ export default function Dashboard() {
   // --- ESG Summary ---
   // Use full-format placeholders so the ESG Summary card keeps a similar height
   const [esgSummary, setEsGSummary] = useState({
-    environmental:
-      "Energy: -- kWh · Renewables: --% · Carbon: -- tCO₂e",
+    environmental: "Energy: -- kWh · Renewables: --% · Carbon: -- tCO₂e",
     social:
       "Supplier diversity: --% · Customer satisfaction: --% · Human capital: --%",
-    governance:
-      "Corporate governance: -- · ISO 9001: -- · Ethics: --",
+    governance: "Corporate governance: -- · ISO 9001: -- · Ethics: --",
   });
 
   // --- KPI States (financial / carbon) ---
@@ -97,12 +95,7 @@ export default function Dashboard() {
         className={`flex items-center gap-1 text-[11px] font-semibold ${color} h-5`}
       >
         {isUp && (
-          <svg
-            width="12"
-            height="12"
-            viewBox="0 0 24 24"
-            className="shrink-0"
-          >
+          <svg width="12" height="12" viewBox="0 0 24 24" className="shrink-0">
             <path
               d="M4 16 L12 8 L20 16"
               stroke="currentColor"
@@ -114,12 +107,7 @@ export default function Dashboard() {
           </svg>
         )}
         {isDown && (
-          <svg
-            width="12"
-            height="12"
-            viewBox="0 0 24 24"
-            className="shrink-0"
-          >
+          <svg width="12" height="12" viewBox="0 0 24 24" className="shrink-0">
             <path
               d="M4 8 L12 16 L20 8"
               stroke="currentColor"
@@ -327,11 +315,7 @@ export default function Dashboard() {
 
       if (!res.ok) {
         const text = await res.text();
-        console.error(
-          "Error response from /api/esg-data:",
-          res.status,
-          text
-        );
+        console.error("Error response from /api/esg-data:", res.status, text);
         throw new Error(`Backend error ${res.status}: ${text}`);
       }
 
@@ -380,9 +364,7 @@ export default function Dashboard() {
         governance: esgSummary.governance,
       });
       setAIInsights([]);
-      setAiError(
-        err.message || "Failed to load ESG metrics and AI insights."
-      );
+      setAiError(err.message || "Failed to load ESG metrics and AI insights.");
       setAiLoading(false);
     }
   };
@@ -592,108 +574,6 @@ export default function Dashboard() {
           </section>
         )}
 
-        {/* ESG Summary + AI Mini Report */}
-        <section className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-stretch">
-          {/* ESG Summary card (left, spanning 2 cols on desktop) */}
-          <div className="lg:col-span-2 h-full">
-            <div className="bg-white rounded-2xl shadow-lg border border-gray-200 p-6 h-full flex flex-col">
-              <div className="flex items-center gap-3 mb-2">
-                <FaLeaf className="text-green-700 text-xl" />
-                <h2 className="text-xl sm:text-2xl font-semibold text-gray-800">
-                  ESG Summary
-                </h2>
-              </div>
-              <p className="text-sm text-gray-600 mb-4">
-                High-level ESG performance snapshot from the latest uploaded
-                dataset.
-              </p>
-
-              {/* Fixed minimum height so the card doesn't jump when text changes */}
-              <div className="space-y-2 text-sm text-gray-800 mt-auto min-h-[80px]">
-                <p>
-                  <span className="font-semibold">Environmental:</span>{" "}
-                  {esgSummary.environmental}
-                </p>
-                <p>
-                  <span className="font-semibold">Social:</span>{" "}
-                  {esgSummary.social}
-                </p>
-                <p>
-                  <span className="font-semibold">Governance:</span>{" "}
-                  {esgSummary.governance}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* AI Mini Report (right) */}
-          <div className="h-full">
-            <div className="bg-white rounded-2xl shadow-lg border border-gray-200 p-6 h-full flex flex-col">
-              <h2 className="text-xl font-semibold text-gray-800 mb-2">
-                AI Mini Report on ESG Summary
-              </h2>
-              <p className="text-xs text-gray-500 mb-3">
-                AI-generated commentary on Environmental, Social and Governance
-                performance based on the latest ESG upload.
-              </p>
-
-              <div className="space-y-4 text-sm flex-1 overflow-y-auto pr-1">
-                {/* Environmental insights */}
-                <div>
-                  <h3 className="font-semibold text-emerald-700 mb-1">
-                    Environmental
-                  </h3>
-                  {envInsights && envInsights.length > 0 ? (
-                    <ul className="list-disc list-inside text-gray-700 space-y-1">
-                      {envInsights.map((i, idx) => (
-                        <li key={idx}>{i}</li>
-                      ))}
-                    </ul>
-                  ) : (
-                    <p className="text-xs text-gray-500">
-                      No AI insights generated yet for Environmental.
-                    </p>
-                  )}
-                </div>
-
-                {/* Social insights */}
-                <div>
-                  <h3 className="font-semibold text-sky-700 mb-1">Social</h3>
-                  {socialInsights && socialInsights.length > 0 ? (
-                    <ul className="list-disc list-inside text-gray-700 space-y-1">
-                      {socialInsights.map((i, idx) => (
-                        <li key={idx}>{i}</li>
-                      ))}
-                    </ul>
-                  ) : (
-                    <p className="text-xs text-gray-500">
-                      No AI insights generated yet for Social.
-                    </p>
-                  )}
-                </div>
-
-                {/* Governance insights */}
-                <div>
-                  <h3 className="font-semibold text-amber-700 mb-1">
-                    Governance
-                  </h3>
-                  {govInsights && govInsights.length > 0 ? (
-                    <ul className="list-disc list-inside text-gray-700 space-y-1">
-                      {govInsights.map((i, idx) => (
-                        <li key={idx}>{i}</li>
-                      ))}
-                    </ul>
-                  ) : (
-                    <p className="text-xs text-gray-500">
-                      No AI insights generated yet for Governance.
-                    </p>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-
         {/* Headline stats row */}
         <section className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 items-stretch">
           <StatCard
@@ -722,7 +602,7 @@ export default function Dashboard() {
           />
         </section>
 
-        {/* ESG Performance Overview */}
+        {/* ESG Performance Overview (now includes ESG Summary + AI Mini Report) */}
         <section>
           <div className="bg-white rounded-2xl shadow-lg border border-gray-200 p-6">
             <div className="flex items-center justify-between mb-4">
@@ -735,6 +615,110 @@ export default function Dashboard() {
               >
                 View detailed ESG metrics →
               </button>
+            </div>
+
+            {/* ESG Summary + AI Mini Report moved here */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-stretch mb-6">
+              {/* ESG Summary card (left, spanning 2 cols on desktop) */}
+              <div className="lg:col-span-2 h-full">
+                <div className="bg-white rounded-2xl shadow-lg border border-gray-200 p-6 h-full flex flex-col">
+                  <div className="flex items-center gap-3 mb-2">
+                    <FaLeaf className="text-green-700 text-xl" />
+                    <h2 className="text-xl sm:text-2xl font-semibold text-gray-800">
+                      ESG Summary
+                    </h2>
+                  </div>
+                  <p className="text-sm text-gray-600 mb-4">
+                    High-level ESG performance snapshot from the latest uploaded
+                    dataset.
+                  </p>
+
+                  {/* Fixed minimum height so the card doesn't jump when text changes */}
+                  <div className="space-y-2 text-sm text-gray-800 mt-auto min-h-[80px]">
+                    <p>
+                      <span className="font-semibold">Environmental:</span>{" "}
+                      {esgSummary.environmental}
+                    </p>
+                    <p>
+                      <span className="font-semibold">Social:</span>{" "}
+                      {esgSummary.social}
+                    </p>
+                    <p>
+                      <span className="font-semibold">Governance:</span>{" "}
+                      {esgSummary.governance}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* AI Mini Report (right) */}
+              <div className="h-full">
+                <div className="bg-white rounded-2xl shadow-lg border border-gray-200 p-6 h-full flex flex-col">
+                  <h2 className="text-xl font-semibold text-gray-800 mb-2">
+                    AI Mini Report on ESG Summary
+                  </h2>
+                  <p className="text-xs text-gray-500 mb-3">
+                    AI-generated commentary on Environmental, Social and
+                    Governance performance based on the latest ESG upload.
+                  </p>
+
+                  <div className="space-y-4 text-sm flex-1 overflow-y-auto pr-1">
+                    {/* Environmental insights */}
+                    <div>
+                      <h3 className="font-semibold text-emerald-700 mb-1">
+                        Environmental
+                      </h3>
+                      {envInsights && envInsights.length > 0 ? (
+                        <ul className="list-disc list-inside text-gray-700 space-y-1">
+                          {envInsights.map((i, idx) => (
+                            <li key={idx}>{i}</li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <p className="text-xs text-gray-500">
+                          No AI insights generated yet for Environmental.
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Social insights */}
+                    <div>
+                      <h3 className="font-semibold text-sky-700 mb-1">
+                        Social
+                      </h3>
+                      {socialInsights && socialInsights.length > 0 ? (
+                        <ul className="list-disc list-inside text-gray-700 space-y-1">
+                          {socialInsights.map((i, idx) => (
+                            <li key={idx}>{i}</li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <p className="text-xs text-gray-500">
+                          No AI insights generated yet for Social.
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Governance insights */}
+                    <div>
+                      <h3 className="font-semibold text-amber-700 mb-1">
+                        Governance
+                      </h3>
+                      {govInsights && govInsights.length > 0 ? (
+                        <ul className="list-disc list-inside text-gray-700 space-y-1">
+                          {govInsights.map((i, idx) => (
+                            <li key={idx}>{i}</li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <p className="text-xs text-gray-500">
+                          No AI insights generated yet for Governance.
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
 
             {/* 3 pillar mini cards */}
