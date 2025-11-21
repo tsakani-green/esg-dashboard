@@ -10,7 +10,7 @@ import {
   Tooltip,
   Legend,
 } from "chart.js";
-import { FaFilePdf } from "react-icons/fa";
+import { FaFilePdf, FaBolt, FaCloud, FaTrash } from "react-icons/fa";
 import { jsPDF } from "jspdf";
 import { SimulationContext } from "../context/SimulationContext";
 
@@ -44,9 +44,7 @@ const EnvironmentalCategory = () => {
         setAiLoading(true);
         setAiError(null);
 
-        const res = await fetch(
-          `${API_BASE_URL}/api/environmental-insights`
-        );
+        const res = await fetch(`${API_BASE_URL}/api/environmental-insights`);
         if (!res.ok) {
           throw new Error(`HTTP ${res.status} ${res.statusText}`);
         }
@@ -83,6 +81,23 @@ const EnvironmentalCategory = () => {
     loadInsights();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // --- Derived KPI summaries ---
+  const totalEnergy = Array.isArray(environmentalMetrics?.energyUsage)
+    ? environmentalMetrics.energyUsage.reduce((sum, v) => sum + Number(v || 0), 0)
+    : null;
+
+  const avgEmissions = Array.isArray(environmentalMetrics?.co2Emissions) &&
+    environmentalMetrics.co2Emissions.length > 0
+    ? environmentalMetrics.co2Emissions.reduce(
+        (sum, v) => sum + Number(v || 0),
+        0
+      ) / environmentalMetrics.co2Emissions.length
+    : null;
+
+  const totalWaste = Array.isArray(environmentalMetrics?.waste)
+    ? environmentalMetrics.waste.reduce((sum, v) => sum + Number(v || 0), 0)
+    : null;
 
   // derive labels from series length
   const periods =
@@ -180,11 +195,28 @@ const EnvironmentalCategory = () => {
     doc.save("AfricaESG_EnvironmentalMiniReport.pdf");
   };
 
+  // Simple KPI card
+  const KpiCard = ({ icon, label, value, unit }) => (
+    <div className="flex items-center gap-3 rounded-2xl bg-white border border-emerald-100 shadow-sm px-4 py-3 h-full">
+      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-50 text-emerald-700 shrink-0">
+        {icon}
+      </div>
+      <div className="leading-tight">
+        <div className="text-xs text-slate-500 uppercase tracking-wide">
+          {label}
+        </div>
+        <div className="text-lg font-semibold text-slate-900">
+          {value ?? "N/A"} {unit && value != null ? unit : ""}
+        </div>
+      </div>
+    </div>
+  );
+
   return (
     <div className="min-h-screen bg-lime-50 py-10 font-sans flex justify-center">
       <div className="w-full max-w-7xl px-4 sm:px-6 lg:px-8">
         {/* Header */}
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
           <div>
             <h1 className="text-3xl sm:text-4xl font-extrabold text-green-900 tracking-tight">
               Environmental Performance
@@ -204,6 +236,34 @@ const EnvironmentalCategory = () => {
             <span>Download Report (PDF)</span>
           </button>
         </div>
+
+        {/* KPI summary row */}
+        <section className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+          <KpiCard
+            icon={<FaBolt size={16} />}
+            label="Total Energy (all periods)"
+            value={
+              totalEnergy != null ? totalEnergy.toLocaleString() : null
+            }
+            unit="kWh"
+          />
+          <KpiCard
+            icon={<FaCloud size={16} />}
+            label="Avg CO₂ per period"
+            value={
+              avgEmissions != null ? avgEmissions.toFixed(0) : null
+            }
+            unit="tCO₂e"
+          />
+          <KpiCard
+            icon={<FaTrash size={16} />}
+            label="Total Waste (all streams)"
+            value={
+              totalWaste != null ? totalWaste.toLocaleString() : null
+            }
+            unit="t"
+          />
+        </section>
 
         {/* Main Content */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
