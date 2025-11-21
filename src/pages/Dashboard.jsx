@@ -517,6 +517,25 @@ export default function Dashboard() {
     </div>
   );
 
+  // --- Derived metrics for ESG Summary tiles ---
+  const envEnergy = extractMetric(esgSummary.environmental, "Energy") || "—";
+  const envRenewables =
+    extractMetric(esgSummary.environmental, "Renewables") || "—";
+  const envCarbon = extractMetric(esgSummary.environmental, "Carbon") || "—";
+
+  const socSupplier =
+    extractMetric(esgSummary.social, "Supplier diversity") || "—";
+  const socCustomer =
+    extractMetric(esgSummary.social, "Customer satisfaction") || "—";
+  const socHuman =
+    extractMetric(esgSummary.social, "Human capital") || "—";
+
+  const govCorp =
+    extractMetric(esgSummary.governance, "Corporate governance") || "—";
+  const govISO =
+    extractMetric(esgSummary.governance, "ISO 9001") || "—";
+  const govEthics = extractMetric(esgSummary.governance, "Ethics") || "—";
+
   return (
     <div className="min-h-screen bg-lime-50 py-10 font-sans">
       <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
@@ -585,31 +604,104 @@ export default function Dashboard() {
           {/* ESG Summary card (left, spanning 2 cols on desktop) */}
           <div className="lg:col-span-2 h-full">
             <div className="bg-white rounded-2xl shadow-lg border border-gray-200 p-6 h-full flex flex-col">
-              <div className="flex items-center gap-3 mb-2">
-                <FaLeaf className="text-green-700 text-xl" />
-                <h2 className="text-xl sm:text-2xl font-semibold text-gray-800">
-                  ESG Summary
-                </h2>
+              <div className="flex items-center justify-between gap-3 mb-2">
+                <div className="flex items-center gap-3">
+                  <FaLeaf className="text-green-700 text-xl" />
+                  <div>
+                    <h2 className="text-xl sm:text-2xl font-semibold text-gray-800">
+                      ESG Summary
+                    </h2>
+                    <p className="text-xs sm:text-sm text-gray-500 mt-0.5">
+                      Condensed E, S and G view based on your latest uploaded
+                      data.
+                    </p>
+                  </div>
+                </div>
+                <span className="hidden sm:inline-flex items-center rounded-full bg-emerald-50 text-emerald-700 border border-emerald-100 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide">
+                  Latest snapshot
+                </span>
               </div>
-              <p className="text-sm text-gray-600 mb-4">
-                High-level ESG performance snapshot from the latest uploaded
-                dataset.
-              </p>
 
-              <div className="space-y-2 text-sm text-gray-800 mt-auto">
-                <p>
-                  <span className="font-semibold">Environmental:</span>{" "}
-                  {esgSummary.environmental}
-                </p>
-                <p>
-                  <span className="font-semibold">Social:</span>{" "}
-                  {esgSummary.social}
-                </p>
-                <p>
-                  <span className="font-semibold">Governance:</span>{" "}
-                  {esgSummary.governance}
-                </p>
+              {/* 3 compact ESG tiles */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
+                {/* Environmental tile */}
+                <div className="rounded-xl bg-gradient-to-br from-emerald-50 via-emerald-50/60 to-emerald-100/60 border border-emerald-100 p-3 flex flex-col gap-1">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="inline-flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wide text-emerald-900">
+                      <span className="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-600 text-white text-[10px]">
+                        E
+                      </span>
+                      Environmental
+                    </span>
+                    <span className="text-[11px] text-emerald-800 bg-white/60 px-2 py-0.5 rounded-full border border-emerald-100">
+                      {envRenewables !== "—"
+                        ? `${envRenewables} renewables`
+                        : "No data"}
+                    </span>
+                  </div>
+                  <div className="mt-1 text-[11px] text-emerald-900/80 space-x-1 flex flex-wrap">
+                    <span className="font-medium">{envEnergy}</span>
+                    <span>·</span>
+                    <span>{envCarbon}</span>
+                  </div>
+                </div>
+
+                {/* Social tile */}
+                <div className="rounded-xl bg-gradient-to-br from-sky-50 via-sky-50/60 to-sky-100/60 border border-sky-100 p-3 flex flex-col gap-1">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="inline-flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wide text-sky-900">
+                      <span className="flex h-5 w-5 items-center justify-center rounded-full bg-sky-600 text-white text-[10px]">
+                        S
+                      </span>
+                      Social
+                    </span>
+                    <span className="text-[11px] text-sky-800 bg-white/60 px-2 py-0.5 rounded-full border border-sky-100">
+                      {socSupplier !== "—"
+                        ? `${socSupplier} diverse spend`
+                        : "No data"}
+                    </span>
+                  </div>
+                  <div className="mt-1 text-[11px] text-sky-900/80 space-x-1 flex flex-wrap">
+                    <span className="font-medium">
+                      {socCustomer !== "—" ? `${socCustomer} CSAT` : "CSAT: —"}
+                    </span>
+                    <span>·</span>
+                    <span>
+                      {socHuman !== "—"
+                        ? `${socHuman} human capital`
+                        : "Human: —"}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Governance tile */}
+                <div className="rounded-xl bg-gradient-to-br from-amber-50 via-amber-50/60 to-amber-100/60 border border-amber-100 p-3 flex flex-col gap-1">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="inline-flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wide text-amber-900">
+                      <span className="flex h-5 w-5 items-center justify-center rounded-full bg-amber-600 text-white text-[10px]">
+                        G
+                      </span>
+                      Governance
+                    </span>
+                    <span className="text-[11px] text-amber-800 bg-white/60 px-2 py-0.5 rounded-full border border-amber-100 max-w-[120px] truncate">
+                      {govCorp}
+                    </span>
+                  </div>
+                  <div className="mt-1 text-[11px] text-amber-900/80 space-x-1 flex flex-wrap">
+                    <span className="font-medium">
+                      {govISO !== "—" ? govISO : "ISO 9001: —"}
+                    </span>
+                    <span>·</span>
+                    <span>{govEthics !== "—" ? govEthics : "Ethics: —"}</span>
+                  </div>
+                </div>
               </div>
+
+              <p className="mt-4 text-[11px] text-slate-500">
+                Snapshot view only – use the detailed Environmental, Social and
+                Governance pages for full metric breakdowns and AI scenario
+                analysis.
+              </p>
             </div>
           </div>
 
