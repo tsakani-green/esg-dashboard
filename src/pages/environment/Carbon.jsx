@@ -1,4 +1,3 @@
-// src/pages/environment/Carbon.jsx
 import React, { useContext, useEffect, useState } from "react";
 import { Line } from "react-chartjs-2";
 import {
@@ -23,6 +22,8 @@ ChartJS.register(
   Legend
 );
 
+const API_BASE_URL = "https://esg-backend-beige.vercel.app";
+
 export default function Carbon() {
   const {
     environmentalMetrics,
@@ -41,7 +42,10 @@ export default function Carbon() {
   const [carbonIntensityValues, setCarbonIntensityValues] = useState(
     new Array(12).fill(0)
   );
+
   const [topInsights, setTopInsights] = useState([]);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState(null);
 
   const monthlyLabels = [
     "Jan-24",
@@ -91,13 +95,65 @@ export default function Carbon() {
       setProductionDataValues(new Array(12).fill(0));
       setCarbonIntensityValues(new Array(12).fill(0));
     }
+  }, [environmentalMetrics]);
 
-    const insights =
-      environmentalInsights && environmentalInsights.length > 0
-        ? environmentalInsights.slice(0, 5)
-        : [];
-    setTopInsights(insights);
-  }, [environmentalMetrics, environmentalInsights]);
+  // ---------- Real AI insights (live) with fallback ----------
+  useEffect(() => {
+    const topicKeywords = ["carbon", "co2", "emission", "ghg", "scope"];
+
+    const matchesTopic = (text = "") => {
+      const lower = String(text).toLowerCase();
+      return topicKeywords.some((kw) => lower.includes(kw));
+    };
+
+    const loadInsights = async () => {
+      try {
+        setAiLoading(true);
+        setAiError(null);
+
+        const res = await fetch(`${API_BASE_URL}/api/environmental-insights`);
+        if (!res.ok) {
+          throw new Error(`HTTP ${res.status} ${res.statusText}`);
+        }
+
+        const data = await res.json();
+        const incoming = Array.isArray(data.insights)
+          ? data.insights
+          : data.insights
+          ? [data.insights]
+          : [];
+
+        const filtered = incoming.filter(matchesTopic);
+
+        if (filtered.length > 0) {
+          setTopInsights(filtered.slice(0, 5));
+        } else if (Array.isArray(environmentalInsights)) {
+          const fallbackFiltered = environmentalInsights.filter(matchesTopic);
+          setTopInsights(
+            (fallbackFiltered.length > 0
+              ? fallbackFiltered
+              : environmentalInsights
+            ).slice(0, 5)
+          );
+        } else {
+          setTopInsights([]);
+        }
+
+        setAiLoading(false);
+      } catch (err) {
+        console.error("Error loading carbon AI insights:", err);
+        if (Array.isArray(environmentalInsights)) {
+          setTopInsights(environmentalInsights.slice(0, 5));
+        } else {
+          setTopInsights([]);
+        }
+        setAiError("Failed to load live AI insights for carbon.");
+        setAiLoading(false);
+      }
+    };
+
+    loadInsights();
+  }, [environmentalInsights]);
 
   // ---------- AI-style baseline / benchmark calculations ----------
   const formatNumber = (value, decimals = 1) => {
@@ -152,6 +208,8 @@ export default function Carbon() {
         backgroundColor: "rgba(239,68,68,0.18)",
         tension: 0.35,
         pointRadius: 3,
+        pointHoverRadius: 5,
+        fill: true,
       },
       {
         label: "Production Output (tonnes)",
@@ -160,6 +218,8 @@ export default function Carbon() {
         backgroundColor: "rgba(14,165,233,0.18)",
         tension: 0.35,
         pointRadius: 3,
+        pointHoverRadius: 5,
+        fill: true,
       },
     ],
   };
@@ -174,6 +234,8 @@ export default function Carbon() {
         backgroundColor: "rgba(34,197,94,0.18)",
         tension: 0.35,
         pointRadius: 3,
+        pointHoverRadius: 5,
+        fill: true,
       },
     ],
   };
@@ -249,10 +311,16 @@ export default function Carbon() {
               Track emissions trends, production output and carbon intensity to
               support decarbonisation and carbon tax planning.
             </p>
-            {(loading) && (
+            {loading && (
               <p className="mt-2 text-xs text-rose-700 flex items-center gap-2">
                 <span className="h-2 w-2 rounded-full bg-rose-500 animate-pulse" />
-                Loading carbon metrics and AI insights…
+                Loading carbon metrics…
+              </p>
+            )}
+            {aiLoading && !loading && (
+              <p className="mt-1 text-xs text-rose-700 flex items-center gap-2">
+                <span className="h-2 w-2 rounded-full bg-rose-500 animate-pulse" />
+                Loading live AI insights…
               </p>
             )}
             {error && (
@@ -347,8 +415,15 @@ export default function Carbon() {
                     data={emissionData}
                     options={{
                       maintainAspectRatio: false,
+                      interaction: { mode: "index", intersect: false },
                       plugins: {
                         legend: { position: "bottom", labels: { boxWidth: 12 } },
+                        tooltip: {
+                          callbacks: {
+                            label: (ctx) =>
+                              `${ctx.dataset.label}: ${ctx.formattedValue}`,
+                          },
+                        },
                       },
                       scales: {
                         x: { grid: { display: false } },
@@ -367,9 +442,6 @@ export default function Carbon() {
                   <h2 className="text-xl sm:text-2xl font-semibold text-gray-800">
                     Carbon Intensity (tCO₂e per tonne)
                   </h2>
-                  <span className="text-[11px] px-2 py-1 rounded-full bg-emerald-50 text-emerald-700 font-semibold uppercase tracking-wide">
-                    Carbon KPI
-                  </span>
                 </div>
                 <p className="text-xs text-gray-500 mb-4">
                   Emissions normalised by production – lower is better.
@@ -379,6 +451,7 @@ export default function Carbon() {
                     data={intensityData}
                     options={{
                       maintainAspectRatio: false,
+                      interaction: { mode: "index", intersect: false },
                       plugins: {
                         legend: { position: "bottom", labels: { boxWidth: 12 } },
                       },
@@ -404,6 +477,10 @@ export default function Carbon() {
                 Baseline, benchmark and performance vs target for carbon
                 intensity, plus AI recommendations.
               </p>
+
+              {aiError && (
+                <p className="text-xs text-red-500 mb-2">{aiError}</p>
+              )}
 
               {/* 1. Baseline */}
               <div className="mb-4">
@@ -486,7 +563,7 @@ export default function Carbon() {
                   4. AI Recommendations
                 </h3>
                 <ul className="list-disc list-inside text-gray-700 space-y-2 text-sm sm:text-base leading-relaxed max-h-[260px] overflow-y-auto pr-1">
-                  {loading ? (
+                  {aiLoading || loading ? (
                     <li className="text-gray-400">
                       Loading AI insights for carbon performance…
                     </li>
