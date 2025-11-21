@@ -1,3 +1,4 @@
+// src/pages/environment/Carbon.jsx (or your current path)
 import React, { useContext, useEffect, useState } from "react";
 import { Line } from "react-chartjs-2";
 import {
@@ -23,6 +24,43 @@ ChartJS.register(
 );
 
 const API_BASE_URL = "https://esg-backend-beige.vercel.app";
+
+// --- Helper: derive suggested actions from carbon insights (like Social/Gov) ---
+const deriveCarbonActions = (insights) => {
+  const text = insights.join(" ").toLowerCase();
+  const actions = new Set();
+
+  if (text.includes("intensity") || text.includes("intensities")) {
+    actions.add("Set year-on-year carbon intensity reduction targets");
+    actions.add("Link intensity KPIs to operational managers");
+  }
+  if (text.includes("scope 1") || text.includes("fuel") || text.includes("combustion")) {
+    actions.add("Optimise fuel mix and combustion efficiency");
+    actions.add("Investigate low-carbon fuel switching opportunities");
+  }
+  if (text.includes("scope 2") || text.includes("electricity") || text.includes("grid")) {
+    actions.add("Increase renewable electricity procurement (PPAs, I-RECs)");
+    actions.add("Run targeted energy efficiency projects at high-load sites");
+  }
+  if (text.includes("scope 3") || text.includes("value chain") || text.includes("supply chain")) {
+    actions.add("Engage key suppliers on carbon disclosure and targets");
+    actions.add("Integrate embodied carbon into procurement criteria");
+  }
+  if (text.includes("carbon tax") || text.includes("tax")) {
+    actions.add("Quantify carbon tax exposure under different price scenarios");
+    actions.add("Prioritise abatement projects with highest tax savings");
+  }
+  if (text.includes("offset") || text.includes("credit")) {
+    actions.add("Review quality and additionality of carbon offsets used");
+    actions.add("Develop a strategy to reduce reliance on offsets over time");
+  }
+
+  if (actions.size === 0 && insights.length > 0) {
+    actions.add("Translate AI insights into a 12–24 month decarbonisation roadmap");
+  }
+
+  return Array.from(actions);
+};
 
 export default function Carbon() {
   const {
@@ -97,9 +135,9 @@ export default function Carbon() {
     }
   }, [environmentalMetrics]);
 
-  // ---------- Real AI insights (live) with fallback ----------
+  // ---------- Real AI insights (live) with robust error handling + fallback ----------
   useEffect(() => {
-    const topicKeywords = ["carbon", "co2", "emission", "ghg", "scope"];
+    const topicKeywords = ["carbon", "co2", "emission", "emissions", "ghg", "scope"];
 
     const matchesTopic = (text = "") => {
       const lower = String(text).toLowerCase();
@@ -112,8 +150,15 @@ export default function Carbon() {
         setAiError(null);
 
         const res = await fetch(`${API_BASE_URL}/api/environmental-insights`);
+
         if (!res.ok) {
-          throw new Error(`HTTP ${res.status} ${res.statusText}`);
+          const text = await res.text();
+          console.error(
+            "Error response from /api/environmental-insights (carbon):",
+            res.status,
+            text
+          );
+          throw new Error(`Backend error ${res.status}: ${text}`);
         }
 
         const data = await res.json();
@@ -126,8 +171,10 @@ export default function Carbon() {
         const filtered = incoming.filter(matchesTopic);
 
         if (filtered.length > 0) {
+          // ✅ Use real AI from backend, carbon-specific
           setTopInsights(filtered.slice(0, 5));
         } else if (Array.isArray(environmentalInsights)) {
+          // Fallback to context if backend returns nothing useful
           const fallbackFiltered = environmentalInsights.filter(matchesTopic);
           setTopInsights(
             (fallbackFiltered.length > 0
@@ -293,6 +340,8 @@ export default function Carbon() {
     !error &&
     emissionDataValues.every((v) => v === 0) &&
     productionDataValues.every((v) => v === 0);
+
+  const actionChips = deriveCarbonActions(topInsights);
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-rose-50 via-emerald-50/40 to-rose-50 py-10 font-sans flex justify-center">
@@ -475,7 +524,7 @@ export default function Carbon() {
               </h2>
               <p className="text-xs text-gray-500 mb-3">
                 Baseline, benchmark and performance vs target for carbon
-                intensity, plus AI recommendations.
+                intensity, plus AI recommendations from AfricaESG.AI.
               </p>
 
               {aiError && (
@@ -538,31 +587,31 @@ export default function Carbon() {
                 ) : (
                   <p className="text-sm text-gray-700">
                     Latest carbon intensity is{" "}
-                    <span className="font-semibold">
-                      {formatNumber(currentIntensity)} tCO₂e/tonne
-                    </span>
-                    , which is{" "}
-                    <span
-                      className={`font-semibold ${
-                        comparisonDelta > 0
-                          ? "text-red-600"
-                          : "text-emerald-600"
-                      }`}
-                    >
-                      {formatNumber(Math.abs(comparisonPercent), 1)}%
-                      {comparisonDelta > 0 ? " above" : " below"}
-                    </span>{" "}
-                    the benchmark.
+                      <span className="font-semibold">
+                        {formatNumber(currentIntensity)} tCO₂e/tonne
+                      </span>
+                      , which is{" "}
+                      <span
+                        className={`font-semibold ${
+                          comparisonDelta > 0
+                            ? "text-red-600"
+                            : "text-emerald-600"
+                        }`}
+                      >
+                        {formatNumber(Math.abs(comparisonPercent), 1)}%
+                        {comparisonDelta > 0 ? " above" : " below"}
+                      </span>{" "}
+                      the benchmark.
                   </p>
                 )}
               </div>
 
-              {/* 4. AI Recommendations */}
+              {/* 4. AI Recommendations + action chips */}
               <div className="mt-2">
                 <h3 className="text-sm font-semibold text-gray-700 mb-2">
                   4. AI Recommendations
                 </h3>
-                <ul className="list-disc list-inside text-gray-700 space-y-2 text-sm sm:text-base leading-relaxed max-h-[260px] overflow-y-auto pr-1">
+                <ul className="list-disc list-inside text-gray-700 space-y-2 text-sm sm:text-base leading-relaxed max-h-[200px] overflow-y-auto pr-1">
                   {aiLoading || loading ? (
                     <li className="text-gray-400">
                       Loading AI insights for carbon performance…
@@ -575,6 +624,24 @@ export default function Carbon() {
                     </li>
                   )}
                 </ul>
+
+                {actionChips.length > 0 && (
+                  <div className="mt-4 border-t border-rose-100 pt-3">
+                    <p className="text-xs sm:text-sm text-gray-500 mb-2">
+                      Suggested next steps based on these AI insights:
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      {actionChips.map((chip) => (
+                        <span
+                          key={chip}
+                          className="px-2.5 py-1 rounded-full bg-rose-50 text-rose-700 text-[11px] border border-rose-100"
+                        >
+                          {chip}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>
