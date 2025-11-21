@@ -13,6 +13,39 @@ import { SimulationContext } from "../context/SimulationContext";
 // Same base URL as other pages
 const API_BASE_URL = "https://esg-backend-beige.vercel.app";
 
+// --- Helper: derive simple “actions” from AI insights (similar style to Social) ---
+const deriveGovernanceActions = (insights) => {
+  const text = insights.join(" ").toLowerCase();
+  const actions = new Set();
+
+  if (text.includes("compliance") || text.includes("finding")) {
+    actions.add("Prioritise closure of open compliance findings");
+    actions.add("Strengthen internal controls and monitoring");
+  }
+  if (text.includes("ethics") || text.includes("bribery") || text.includes("fraud")) {
+    actions.add("Refresh code of ethics and anti-bribery training");
+    actions.add("Perform targeted ethics risk assessment");
+  }
+  if (text.includes("board") || text.includes("governance")) {
+    actions.add("Review board composition and ESG oversight");
+    actions.add("Enhance governance reporting to the board");
+  }
+  if (text.includes("privacy") || text.includes("data") || text.includes("cyber")) {
+    actions.add("Review data privacy and cybersecurity controls");
+    actions.add("Run phishing and cyber awareness campaigns");
+  }
+  if (text.includes("supplier") || text.includes("supply chain")) {
+    actions.add("Increase ESG audits across key suppliers");
+    actions.add("Update supplier code of conduct and ESG clauses");
+  }
+
+  if (actions.size === 0 && insights.length > 0) {
+    actions.add("Translate governance insights into a 90-day action plan");
+  }
+
+  return Array.from(actions);
+};
+
 const GovernanceCategory = () => {
   const { governanceMetrics, governanceInsights, loading: contextLoading } =
     useContext(SimulationContext);
@@ -84,7 +117,7 @@ const GovernanceCategory = () => {
             : [];
 
         if (incoming.length > 0) {
-          // Use real AI from backend
+          // ✅ Use real AI from backend
           setLiveGovInsights(incoming.slice(0, 10));
         } else if (Array.isArray(governanceInsights)) {
           // Fallback to context if backend returns nothing
@@ -336,6 +369,8 @@ const GovernanceCategory = () => {
     </div>
   );
 
+  const actionChips = deriveGovernanceActions(liveGovInsights);
+
   return (
     <div className="min-h-screen bg-lime-50 py-10 font-sans">
       <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
@@ -464,11 +499,31 @@ const GovernanceCategory = () => {
 
             {/* Insights display */}
             {liveGovInsights.length > 0 ? (
-              <ul className="list-disc list-inside space-y-2 text-sm leading-relaxed max-h-[650px] overflow-y-auto">
-                {liveGovInsights.map((note, idx) => (
-                  <li key={idx}>{note}</li>
-                ))}
-              </ul>
+              <>
+                <ul className="list-disc list-inside space-y-2 text-sm leading-relaxed max-h-[380px] overflow-y-auto pr-1">
+                  {liveGovInsights.map((note, idx) => (
+                    <li key={idx}>{note}</li>
+                  ))}
+                </ul>
+
+                {actionChips.length > 0 && (
+                  <div className="mt-4 border-t border-slate-100 pt-3">
+                    <p className="text-xs sm:text-sm text-gray-500 mb-2">
+                      Suggested next steps based on these insights:
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      {actionChips.map((chip) => (
+                        <span
+                          key={chip}
+                          className="px-2.5 py-1 rounded-full bg-amber-50 text-amber-800 text-[11px] border border-amber-100"
+                        >
+                          {chip}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </>
             ) : (
               <p className="text-gray-500 italic">
                 No AI insights available for governance metrics.
