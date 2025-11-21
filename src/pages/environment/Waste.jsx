@@ -1,4 +1,3 @@
-// src/pages/environment/Waste.jsx
 import React, { useContext, useEffect, useState } from "react";
 import { Line } from "react-chartjs-2";
 import {
@@ -24,6 +23,8 @@ ChartJS.register(
   Legend
 );
 
+const API_BASE_URL = "https://esg-backend-beige.vercel.app";
+
 export default function Waste() {
   const {
     environmentalMetrics,
@@ -40,7 +41,10 @@ export default function Waste() {
   const [wasteIntensityValues, setWasteIntensityValues] = useState(
     new Array(12).fill(0)
   );
+
   const [topInsights, setTopInsights] = useState([]);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState(null);
 
   const monthlyLabels = [
     "Jan-24",
@@ -67,7 +71,6 @@ export default function Waste() {
   // Populate waste + production + intensity from context
   useEffect(() => {
     if (environmentalMetrics) {
-      // 🔁 Adjust field names if needed
       const wasteRaw =
         environmentalMetrics.wasteGenerated ||
         environmentalMetrics.waste ||
@@ -91,13 +94,71 @@ export default function Waste() {
       setProductionDataValues(new Array(12).fill(0));
       setWasteIntensityValues(new Array(12).fill(0));
     }
+  }, [environmentalMetrics]);
 
-    const insights =
-      environmentalInsights && environmentalInsights.length > 0
-        ? environmentalInsights.slice(0, 5)
-        : [];
-    setTopInsights(insights);
-  }, [environmentalMetrics, environmentalInsights]);
+  // ---------- Real AI insights (live) with fallback ----------
+  useEffect(() => {
+    const topicKeywords = [
+      "waste",
+      "landfill",
+      "recycling",
+      "circular",
+      "diversion",
+    ];
+
+    const matchesTopic = (text = "") => {
+      const lower = String(text).toLowerCase();
+      return topicKeywords.some((kw) => lower.includes(kw));
+    };
+
+    const loadInsights = async () => {
+      try {
+        setAiLoading(true);
+        setAiError(null);
+
+        const res = await fetch(`${API_BASE_URL}/api/environmental-insights`);
+        if (!res.ok) {
+          throw new Error(`HTTP ${res.status} ${res.statusText}`);
+        }
+
+        const data = await res.json();
+        const incoming = Array.isArray(data.insights)
+          ? data.insights
+          : data.insights
+          ? [data.insights]
+          : [];
+
+        const filtered = incoming.filter(matchesTopic);
+
+        if (filtered.length > 0) {
+          setTopInsights(filtered.slice(0, 5));
+        } else if (Array.isArray(environmentalInsights)) {
+          const fallbackFiltered = environmentalInsights.filter(matchesTopic);
+          setTopInsights(
+            (fallbackFiltered.length > 0
+              ? fallbackFiltered
+              : environmentalInsights
+            ).slice(0, 5)
+          );
+        } else {
+          setTopInsights([]);
+        }
+
+        setAiLoading(false);
+      } catch (err) {
+        console.error("Error loading waste AI insights:", err);
+        if (Array.isArray(environmentalInsights)) {
+          setTopInsights(environmentalInsights.slice(0, 5));
+        } else {
+          setTopInsights([]);
+        }
+        setAiError("Failed to load live AI insights for waste.");
+        setAiLoading(false);
+      }
+    };
+
+    loadInsights();
+  }, [environmentalInsights]);
 
   // ---------- AI baseline / benchmark like Energy & Carbon ----------
   const formatNumber = (value, decimals = 1) => {
@@ -152,6 +213,8 @@ export default function Waste() {
         backgroundColor: "rgba(249,115,22,0.18)",
         tension: 0.35,
         pointRadius: 3,
+        pointHoverRadius: 5,
+        fill: true,
       },
       {
         label: "Production Output (tonnes)",
@@ -160,6 +223,8 @@ export default function Waste() {
         backgroundColor: "rgba(34,197,94,0.18)",
         tension: 0.35,
         pointRadius: 3,
+        pointHoverRadius: 5,
+        fill: true,
       },
     ],
   };
@@ -174,6 +239,8 @@ export default function Waste() {
         backgroundColor: "rgba(79,70,229,0.18)",
         tension: 0.35,
         pointRadius: 3,
+        pointHoverRadius: 5,
+        fill: true,
       },
     ],
   };
@@ -252,7 +319,13 @@ export default function Waste() {
             {loading && (
               <p className="mt-2 text-xs text-amber-700 flex items-center gap-2">
                 <span className="h-2 w-2 rounded-full bg-amber-500 animate-pulse" />
-                Loading waste metrics and AI insights…
+                Loading waste metrics…
+              </p>
+            )}
+            {aiLoading && !loading && (
+              <p className="mt-1 text-xs text-amber-700 flex items-center gap-2">
+                <span className="h-2 w-2 rounded-full bg-amber-500 animate-pulse" />
+                Loading live AI insights…
               </p>
             )}
             {error && (
@@ -340,13 +413,15 @@ export default function Waste() {
                   </span>
                 </div>
                 <p className="text-xs text-gray-500 mb-4">
-                  Monthly waste generation profile compared with production volumes.
+                  Monthly waste generation profile compared with production
+                  volumes.
                 </p>
                 <div className="h-64 sm:h-72">
                   <Line
                     data={wasteData}
                     options={{
                       maintainAspectRatio: false,
+                      interaction: { mode: "index", intersect: false },
                       plugins: {
                         legend: { position: "bottom", labels: { boxWidth: 12 } },
                       },
@@ -379,6 +454,7 @@ export default function Waste() {
                     data={intensityData}
                     options={{
                       maintainAspectRatio: false,
+                      interaction: { mode: "index", intersect: false },
                       plugins: {
                         legend: { position: "bottom", labels: { boxWidth: 12 } },
                       },
@@ -401,9 +477,13 @@ export default function Waste() {
                 AI Analysis – Waste
               </h2>
               <p className="text-xs text-gray-500 mb-3">
-                Baseline, benchmark and performance vs target for waste intensity,
-                plus AI recommendations.
+                Baseline, benchmark and performance vs target for waste
+                intensity, plus AI recommendations.
               </p>
+
+              {aiError && (
+                <p className="text-xs text-red-500 mb-2">{aiError}</p>
+              )}
 
               {/* 1. Baseline */}
               <div className="mb-4">
@@ -486,7 +566,7 @@ export default function Waste() {
                   4. AI Recommendations
                 </h3>
                 <ul className="list-disc list-inside text-gray-700 space-y-2 text-sm sm:text-base leading-relaxed max-h-[260px] overflow-y-auto pr-1">
-                  {loading ? (
+                  {aiLoading || loading ? (
                     <li className="text-gray-400">
                       Loading AI insights for waste performance…
                     </li>
