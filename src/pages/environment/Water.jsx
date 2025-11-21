@@ -1,4 +1,3 @@
-// src/pages/environment/Water.jsx
 import React, { useContext, useEffect, useState } from "react";
 import { Line } from "react-chartjs-2";
 import {
@@ -24,6 +23,8 @@ ChartJS.register(
   Legend
 );
 
+const API_BASE_URL = "https://esg-backend-beige.vercel.app";
+
 export default function Water() {
   const {
     environmentalMetrics,
@@ -40,7 +41,10 @@ export default function Water() {
   const [waterIntensityValues, setWaterIntensityValues] = useState(
     new Array(12).fill(0)
   );
+
   const [topInsights, setTopInsights] = useState([]);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState(null);
 
   const monthlyLabels = [
     "Jan-24",
@@ -67,7 +71,6 @@ export default function Water() {
   // Populate water + production + intensity from context
   useEffect(() => {
     if (environmentalMetrics) {
-      // 🔁 Adjust field names if your backend uses different ones
       const waterRaw =
         environmentalMetrics.waterUse ||
         environmentalMetrics.waterConsumption ||
@@ -91,13 +94,71 @@ export default function Water() {
       setProductionDataValues(new Array(12).fill(0));
       setWaterIntensityValues(new Array(12).fill(0));
     }
+  }, [environmentalMetrics]);
 
-    const insights =
-      environmentalInsights && environmentalInsights.length > 0
-        ? environmentalInsights.slice(0, 5)
-        : [];
-    setTopInsights(insights);
-  }, [environmentalMetrics, environmentalInsights]);
+  // ---------- Real AI insights (live) with fallback ----------
+  useEffect(() => {
+    const topicKeywords = [
+      "water",
+      "abstraction",
+      "consumption",
+      "withdrawal",
+      "efficiency",
+    ];
+
+    const matchesTopic = (text = "") => {
+      const lower = String(text).toLowerCase();
+      return topicKeywords.some((kw) => lower.includes(kw));
+    };
+
+    const loadInsights = async () => {
+      try {
+        setAiLoading(true);
+        setAiError(null);
+
+        const res = await fetch(`${API_BASE_URL}/api/environmental-insights`);
+        if (!res.ok) {
+          throw new Error(`HTTP ${res.status} ${res.statusText}`);
+        }
+
+        const data = await res.json();
+        const incoming = Array.isArray(data.insights)
+          ? data.insights
+          : data.insights
+          ? [data.insights]
+          : [];
+
+        const filtered = incoming.filter(matchesTopic);
+
+        if (filtered.length > 0) {
+          setTopInsights(filtered.slice(0, 5));
+        } else if (Array.isArray(environmentalInsights)) {
+          const fallbackFiltered = environmentalInsights.filter(matchesTopic);
+          setTopInsights(
+            (fallbackFiltered.length > 0
+              ? fallbackFiltered
+              : environmentalInsights
+            ).slice(0, 5)
+          );
+        } else {
+          setTopInsights([]);
+        }
+
+        setAiLoading(false);
+      } catch (err) {
+        console.error("Error loading water AI insights:", err);
+        if (Array.isArray(environmentalInsights)) {
+          setTopInsights(environmentalInsights.slice(0, 5));
+        } else {
+          setTopInsights([]);
+        }
+        setAiError("Failed to load live AI insights for water.");
+        setAiLoading(false);
+      }
+    };
+
+    loadInsights();
+  }, [environmentalInsights]);
 
   // ---------- AI-style baseline / benchmark calculations ----------
   const formatNumber = (value, decimals = 1) => {
@@ -152,6 +213,8 @@ export default function Water() {
         backgroundColor: "rgba(14,165,233,0.18)",
         tension: 0.35,
         pointRadius: 3,
+        pointHoverRadius: 5,
+        fill: true,
       },
       {
         label: "Production Output (tonnes)",
@@ -160,6 +223,8 @@ export default function Water() {
         backgroundColor: "rgba(16,185,129,0.18)",
         tension: 0.35,
         pointRadius: 3,
+        pointHoverRadius: 5,
+        fill: true,
       },
     ],
   };
@@ -174,6 +239,8 @@ export default function Water() {
         backgroundColor: "rgba(99,102,241,0.18)",
         tension: 0.35,
         pointRadius: 3,
+        pointHoverRadius: 5,
+        fill: true,
       },
     ],
   };
@@ -252,7 +319,13 @@ export default function Water() {
             {loading && (
               <p className="mt-2 text-xs text-sky-700 flex items-center gap-2">
                 <span className="h-2 w-2 rounded-full bg-sky-500 animate-pulse" />
-                Loading water metrics and AI insights…
+                Loading water metrics…
+              </p>
+            )}
+            {aiLoading && !loading && (
+              <p className="mt-1 text-xs text-sky-700 flex items-center gap-2">
+                <span className="h-2 w-2 rounded-full bg-sky-500 animate-pulse" />
+                Loading live AI insights…
               </p>
             )}
             {error && (
@@ -347,6 +420,7 @@ export default function Water() {
                     data={waterData}
                     options={{
                       maintainAspectRatio: false,
+                      interaction: { mode: "index", intersect: false },
                       plugins: {
                         legend: { position: "bottom", labels: { boxWidth: 12 } },
                       },
@@ -379,6 +453,7 @@ export default function Water() {
                     data={intensityData}
                     options={{
                       maintainAspectRatio: false,
+                      interaction: { mode: "index", intersect: false },
                       plugins: {
                         legend: { position: "bottom", labels: { boxWidth: 12 } },
                       },
@@ -404,6 +479,10 @@ export default function Water() {
                 Baseline, benchmark and performance vs target for water
                 intensity, plus AI recommendations.
               </p>
+
+              {aiError && (
+                <p className="text-xs text-red-500 mb-2">{aiError}</p>
+              )}
 
               {/* 1. Baseline */}
               <div className="mb-4">
@@ -439,9 +518,9 @@ export default function Water() {
                 ) : (
                   <p className="text-sm text-gray-700">
                     Target / benchmark water intensity is{" "}
-                      <span className="font-semibold">
-                        {formatNumber(benchmarkIntensityRaw)} m³/tonne
-                      </span>
+                    <span className="font-semibold">
+                      {formatNumber(benchmarkIntensityRaw)} m³/tonne
+                    </span>
                     .
                   </p>
                 )}
@@ -486,7 +565,7 @@ export default function Water() {
                   4. AI Recommendations
                 </h3>
                 <ul className="list-disc list-inside text-gray-700 space-y-2 text-sm sm:text-base leading-relaxed max-h-[260px] overflow-y-auto pr-1">
-                  {loading ? (
+                  {aiLoading || loading ? (
                     <li className="text-gray-400">
                       Loading AI insights for water performance…
                     </li>
