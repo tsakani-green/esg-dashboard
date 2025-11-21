@@ -1,5 +1,5 @@
 // src/pages/GovernanceCategory.jsx
-import React, { useContext, useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   FaFilePdf,
   FaBalanceScale,
@@ -8,7 +8,6 @@ import {
   FaTruck,
 } from "react-icons/fa";
 import { jsPDF } from "jspdf";
-import { SimulationContext } from "../context/SimulationContext";
 
 // Same base URL as other pages
 const API_BASE_URL = "https://esg-backend-beige.vercel.app";
@@ -47,18 +46,16 @@ const deriveGovernanceActions = (insights) => {
 };
 
 const GovernanceCategory = () => {
-  const { governanceMetrics, governanceInsights, loading: contextLoading } =
-    useContext(SimulationContext);
-
-  // Governance summary coming directly from /api/esg-data (updated on upload)
+  // Governance summary + metrics coming directly from /api/esg-data (updated on upload)
   const [governanceSummary, setGovernanceSummary] = useState(null);
+  const [governanceMetrics, setGovernanceMetrics] = useState(null);
 
-  // LIVE AI governance insights from backend
+  // LIVE AI governance insights from backend (like Dashboard.jsx loadPillarInsights → govInsights)
   const [liveGovInsights, setLiveGovInsights] = useState([]);
   const [liveLoading, setLiveLoading] = useState(false);
   const [liveError, setLiveError] = useState(null);
 
-  // --- Load governance summary (from /api/esg-data) ---
+  // --- Load governance summary & metrics (from /api/esg-data) ---
   useEffect(() => {
     const fetchSummary = async () => {
       try {
@@ -82,16 +79,23 @@ const GovernanceCategory = () => {
         }
 
         setGovernanceSummary(data.mockData.summary.governance || null);
+
+        // Try to pick up governance-specific metrics if present, else fall back to whole metrics block
+        const metricsBlock = data.mockData.metrics || null;
+        const govMetrics =
+          (metricsBlock && metricsBlock.governance) || metricsBlock || null;
+        setGovernanceMetrics(govMetrics);
       } catch (err) {
         console.error("Error fetching governance summary:", err);
         setGovernanceSummary(null);
+        setGovernanceMetrics(null);
       }
     };
 
     fetchSummary();
   }, []);
 
-  // --- Load LIVE governance insights (from /api/governance-insights) ---
+  // --- Load LIVE governance insights (from /api/governance-insights) like Dashboard.loadPillarInsights ---
   useEffect(() => {
     const fetchLiveGovInsights = async () => {
       setLiveLoading(true);
@@ -116,32 +120,19 @@ const GovernanceCategory = () => {
             ? data.insights
             : [];
 
-        if (incoming.length > 0) {
-          // ✅ Use real AI from backend
-          setLiveGovInsights(incoming.slice(0, 10));
-        } else if (Array.isArray(governanceInsights)) {
-          // Fallback to context if backend returns nothing
-          setLiveGovInsights(governanceInsights.slice(0, 10));
-        } else {
-          setLiveGovInsights([]);
-        }
+        // ✅ Same pattern as Dashboard.jsx → slice to top N governance insights
+        setLiveGovInsights(incoming.slice(0, 10));
       } catch (err) {
         console.error("Live governance AI error:", err);
         setLiveError("Failed to load live AI governance insights.");
-        // Fallback: SimulationContext insights
-        if (Array.isArray(governanceInsights)) {
-          setLiveGovInsights(governanceInsights.slice(0, 10));
-        } else {
-          setLiveGovInsights([]);
-        }
+        setLiveGovInsights([]);
       }
 
       setLiveLoading(false);
     };
 
     fetchLiveGovInsights();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [governanceInsights]);
+  }, []);
 
   // ------- Helpers -------
   const metricsVal = (field, fallback = "N/A") =>
@@ -327,9 +318,8 @@ const GovernanceCategory = () => {
       y += 4;
     });
 
-    // AI mini report – prefer live AI, then fallback to SimulationContext
-    const reportInsights =
-      liveGovInsights.length > 0 ? liveGovInsights : governanceInsights || [];
+    // AI mini report – use live AI from backend (same source as Dashboard govInsights)
+    const reportInsights = liveGovInsights;
 
     y += 6;
     doc.setFont("helvetica", "bold");
@@ -486,7 +476,7 @@ const GovernanceCategory = () => {
             </p>
 
             {/* Loading state */}
-            {liveLoading || contextLoading ? (
+            {liveLoading ? (
               <p className="text-gray-500 italic mb-2">
                 Fetching AI insights…
               </p>
