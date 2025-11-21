@@ -25,9 +25,6 @@ const GovernanceCategory = () => {
   const [liveLoading, setLiveLoading] = useState(false);
   const [liveError, setLiveError] = useState(null);
 
-  // Fallback if backend insights not available
-  const fallbackInsights = governanceInsights || [];
-
   // --- Load governance summary (from /api/esg-data) ---
   useEffect(() => {
     const fetchSummary = async () => {
@@ -52,24 +49,42 @@ const GovernanceCategory = () => {
 
       try {
         const res = await fetch(`${API_BASE_URL}/api/governance-insights`);
-        const data = await res.json();
+        if (!res.ok) {
+          throw new Error(`HTTP ${res.status} ${res.statusText}`);
+        }
 
-        if (Array.isArray(data.insights)) {
-          setLiveGovInsights(data.insights.slice(0, 10)); // top 10
+        const data = await res.json();
+        const incoming =
+          Array.isArray(data.insights) && data.insights.length > 0
+            ? data.insights
+            : [];
+
+        if (incoming.length > 0) {
+          // ✅ Use real AI from backend
+          setLiveGovInsights(incoming.slice(0, 10));
+        } else if (Array.isArray(governanceInsights)) {
+          // Fallback to context if backend returns nothing
+          setLiveGovInsights(governanceInsights.slice(0, 10));
         } else {
           setLiveGovInsights([]);
         }
       } catch (err) {
         console.error("Live governance AI error:", err);
         setLiveError("Failed to load live AI governance insights.");
-        setLiveGovInsights([]);
+        // Fallback: SimulationContext insights
+        if (Array.isArray(governanceInsights)) {
+          setLiveGovInsights(governanceInsights.slice(0, 10));
+        } else {
+          setLiveGovInsights([]);
+        }
       }
 
       setLiveLoading(false);
     };
 
     fetchLiveGovInsights();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [governanceInsights]);
 
   // ------- Helpers -------
   const metricsVal = (field, fallback = "N/A") =>
@@ -255,9 +270,10 @@ const GovernanceCategory = () => {
       y += 4;
     });
 
-    // AI mini report (prefer live, then fallback)
+    // AI mini report – prefer live AI, then fallback to SimulationContext
     const reportInsights =
-      liveGovInsights.length > 0 ? liveGovInsights : fallbackInsights;
+      liveGovInsights.length > 0 ? liveGovInsights : governanceInsights || [];
+
     y += 6;
     doc.setFont("helvetica", "bold");
     doc.text("AI Mini Report – Governance:", 14, y);
@@ -422,16 +438,10 @@ const GovernanceCategory = () => {
               <p className="text-red-500 text-sm mb-2">{liveError}</p>
             ) : null}
 
-            {/* Insights display: prefer live API, then fallback */}
+            {/* Insights display (already prefers real AI, then fallback) */}
             {liveGovInsights.length > 0 ? (
               <ul className="list-disc list-inside space-y-2 text-sm leading-relaxed max-h-[650px] overflow-y-auto">
                 {liveGovInsights.map((note, idx) => (
-                  <li key={idx}>{note}</li>
-                ))}
-              </ul>
-            ) : fallbackInsights.length > 0 ? (
-              <ul className="list-disc list-inside space-y-2 text-sm leading-relaxed max-h-[650px] overflow-y-auto">
-                {fallbackInsights.map((note, idx) => (
                   <li key={idx}>{note}</li>
                 ))}
               </ul>
