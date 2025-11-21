@@ -799,6 +799,80 @@ export default function Dashboard() {
             </div>
           </div>
         </section>
+        
+        {/* Recent activity & quick navigation */}
+        <section className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch">
+          {/* Recent uploads */}
+          <div className="bg-white/90 backdrop-blur rounded-2xl shadow-lg border border-gray-200 p-6 h-full flex flex-col">
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-base font-semibold text-gray-800">
+                Recent ESG Data Uploads
+              </h2>
+              <span className="text-xs text-slate-500">Latest 5 uploads</span>
+            </div>
+
+            {recentUploads.length === 0 ? (
+              <p className="text-sm text-slate-500">
+                No uploads recorded yet. Upload an Excel or JSON ESG dataset to
+                see activity here.
+              </p>
+            ) : (
+              <ul className="divide-y divide-slate-100 text-sm text-slate-700">
+                {recentUploads.slice(0, 5).map((item, idx) => (
+                  <li
+                    key={idx}
+                    className="py-2 flex items-center justify-between"
+                  >
+                    <div>
+                      <div className="font-medium">{item.name}</div>
+                      <div className="text-xs text-slate-500">
+                        {item.type} · {item.status}
+                      </div>
+                    </div>
+                    <div className="text-xs text-slate-400">{item.time}</div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+
+          {/* Quick navigation */}
+          <div className="bg-white/90 backdrop-blur rounded-2xl shadow-lg border border-gray-200 p-6 h-full flex flex-col">
+            <h2 className="text-base font-semibold text-gray-800 mb-3">
+              Quick Navigation
+            </h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm mt-1">
+              <button
+                onClick={() => navigate("/dashboard/environment/energy")}
+                className="flex items-center justify-between rounded-xl border border-emerald-100 bg-emerald-50/50 px-4 py-3 hover:border-emerald-300 hover:bg-emerald-50 transition-colors"
+              >
+                <span>Environmental detail</span>
+                <FaCloud className="text-emerald-600" />
+              </button>
+              <button
+                onClick={() => navigate("/dashboard/governance/corporate")}
+                className="flex items-center justify-between rounded-xl border border-amber-100 bg-amber-50/50 px-4 py-3 hover:border-amber-300 hover:bg-amber-50 transition-colors"
+              >
+                <span>Governance detail</span>
+                <FaBalanceScaleLeft className="text-amber-600" />
+              </button>
+              <button
+                onClick={() => navigate("/dashboard/data-import")}
+                className="flex items-center justify-between rounded-xl border border-sky-100 bg-sky-50/50 px-4 py-3 hover:border-sky-300 hover:bg-sky-50 transition-colors"
+              >
+                <span>Data import workspace</span>
+                <FaUpload className="text-sky-600" />
+              </button>
+              <button
+                onClick={() => navigate("/dashboard/notifications")}
+                className="flex items-center justify-between rounded-xl border border-slate-100 bg-slate-50/70 px-4 py-3 hover:border-slate-300 hover:bg-white transition-colors"
+              >
+                <span>Alerts & notifications</span>
+                <FaExclamationTriangle className="text-amber-500" />
+              </button>
+            </div>
+          </div>
+        </section>
 
         {/* ESG Summary + AI Mini Report AFTER ESG Performance Overview */}
         <section className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-stretch">
@@ -902,79 +976,6 @@ export default function Dashboard() {
           </div>
         </section>
 
-        {/* Recent activity & quick navigation */}
-        <section className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch">
-          {/* Recent uploads */}
-          <div className="bg-white/90 backdrop-blur rounded-2xl shadow-lg border border-gray-200 p-6 h-full flex flex-col">
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="text-base font-semibold text-gray-800">
-                Recent ESG Data Uploads
-              </h2>
-              <span className="text-xs text-slate-500">Latest 5 uploads</span>
-            </div>
-
-            {recentUploads.length === 0 ? (
-              <p className="text-sm text-slate-500">
-                No uploads recorded yet. Upload an Excel or JSON ESG dataset to
-                see activity here.
-              </p>
-            ) : (
-              <ul className="divide-y divide-slate-100 text-sm text-slate-700">
-                {recentUploads.slice(0, 5).map((item, idx) => (
-                  <li
-                    key={idx}
-                    className="py-2 flex items-center justify-between"
-                  >
-                    <div>
-                      <div className="font-medium">{item.name}</div>
-                      <div className="text-xs text-slate-500">
-                        {item.type} · {item.status}
-                      </div>
-                    </div>
-                    <div className="text-xs text-slate-400">{item.time}</div>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-
-          {/* Quick navigation */}
-          <div className="bg-white/90 backdrop-blur rounded-2xl shadow-lg border border-gray-200 p-6 h-full flex flex-col">
-            <h2 className="text-base font-semibold text-gray-800 mb-3">
-              Quick Navigation
-            </h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm mt-1">
-              <button
-                onClick={() => navigate("/dashboard/environment/energy")}
-                className="flex items-center justify-between rounded-xl border border-emerald-100 bg-emerald-50/50 px-4 py-3 hover:border-emerald-300 hover:bg-emerald-50 transition-colors"
-              >
-                <span>Environmental detail</span>
-                <FaCloud className="text-emerald-600" />
-              </button>
-              <button
-                onClick={() => navigate("/dashboard/governance/corporate")}
-                className="flex items-center justify-between rounded-xl border border-amber-100 bg-amber-50/50 px-4 py-3 hover:border-amber-300 hover:bg-amber-50 transition-colors"
-              >
-                <span>Governance detail</span>
-                <FaBalanceScaleLeft className="text-amber-600" />
-              </button>
-              <button
-                onClick={() => navigate("/dashboard/data-import")}
-                className="flex items-center justify-between rounded-xl border border-sky-100 bg-sky-50/50 px-4 py-3 hover:border-sky-300 hover:bg-sky-50 transition-colors"
-              >
-                <span>Data import workspace</span>
-                <FaUpload className="text-sky-600" />
-              </button>
-              <button
-                onClick={() => navigate("/dashboard/notifications")}
-                className="flex items-center justify-between rounded-xl border border-slate-100 bg-slate-50/70 px-4 py-3 hover:border-slate-300 hover:bg-white transition-colors"
-              >
-                <span>Alerts & notifications</span>
-                <FaExclamationTriangle className="text-amber-500" />
-              </button>
-            </div>
-          </div>
-        </section>
       </div>
     </div>
   );
