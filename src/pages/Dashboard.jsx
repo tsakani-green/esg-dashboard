@@ -878,20 +878,20 @@ export default function Dashboard() {
         <section className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-stretch">
           {/* ESG Summary card */}
           <div className="lg:col-span-2 h-full">
-            <div className="bg-white rounded-2xl shadow-lg border border-gray-200 p-6 h-full flex flex-col">
+            <div className="bg-white rounded-2xl shadow-lg border border-gray-200 p-6 h-[260px] flex flex-col">
               <div className="flex items-center gap-3 mb-2">
                 <FaLeaf className="text-green-700 text-xl" />
                 <h2 className="text-xl sm:text-2xl font-semibold text-gray-800">
                   ESG Summary
                 </h2>
               </div>
-              <p className="text-sm text-gray-600 mb-4">
+              <p className="text-sm text-gray-600 mb-2">
                 High-level ESG performance snapshot from the latest uploaded
                 dataset.
               </p>
 
-              {/* Fixed height so the card doesn't jump when text changes */}
-              <div className="space-y-2 text-sm text-gray-800 mt-auto min-h-[140px] h-[140px] overflow-hidden">
+              {/* Fixed-height content area with scroll if needed */}
+              <div className="space-y-2 text-sm text-gray-800 flex-1 overflow-y-auto min-h-0">
                 <p>
                   <span className="font-semibold">Environmental:</span>{" "}
                   {esgSummary.environmental}
@@ -910,16 +910,16 @@ export default function Dashboard() {
 
           {/* AI Mini Report */}
           <div className="h-full">
-            <div className="bg-white rounded-2xl shadow-lg border border-gray-200 p-6 h-full flex flex-col">
+            <div className="bg-white rounded-2xl shadow-lg border border-gray-200 p-6 h-[260px] flex flex-col">
               <h2 className="text-xl font-semibold text-gray-800 mb-2">
                 AI Mini Report on ESG Summary
               </h2>
-              <p className="text-xs text-gray-500 mb-3">
+              <p className="text-xs text-gray-500 mb-2">
                 AI-generated commentary on Environmental, Social and Governance
                 performance based on the latest ESG upload.
               </p>
 
-              <div className="space-y-4 text-sm flex-1 overflow-y-auto pr-1">
+              <div className="space-y-4 text-sm flex-1 overflow-y-auto pr-1 min-h-0">
                 {/* Environmental insights */}
                 <div>
                   <h3 className="font-semibold text-emerald-700 mb-1">
