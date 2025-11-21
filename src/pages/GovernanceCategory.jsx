@@ -10,7 +10,7 @@ import {
 import { jsPDF } from "jspdf";
 import { SimulationContext } from "../context/SimulationContext";
 
-// ✅ Same base URL style as Dashboard
+// ✅ Same base URL style as Dashboard / other pages
 const API_BASE_URL = "https://esg-backend-beige.vercel.app";
 
 const GovernanceCategory = () => {
@@ -55,7 +55,7 @@ const GovernanceCategory = () => {
         const data = await res.json();
 
         if (Array.isArray(data.insights)) {
-          setLiveGovInsights(data.insights.slice(0, 10)); // top 10, just in case
+          setLiveGovInsights(data.insights.slice(0, 10)); // top 10
         } else {
           setLiveGovInsights([]);
         }
@@ -71,7 +71,7 @@ const GovernanceCategory = () => {
     fetchLiveGovInsights();
   }, []);
 
-  // Helpers
+  // ------- Helpers -------
   const metricsVal = (field, fallback = "N/A") =>
     governanceMetrics && governanceMetrics[field] != null
       ? governanceMetrics[field]
@@ -103,6 +103,24 @@ const GovernanceCategory = () => {
     }
     return "bg-amber-50 text-amber-800 border border-amber-200";
   };
+
+  // ------- KPI summary values (for tiles at top) -------
+  const overallGovStatus =
+    summaryVal(
+      "corporateGovernance",
+      metricsVal("corporateGovernance", "Compliant")
+    ) || "Compliant";
+
+  const complianceFindingsRaw = summaryVal(
+    "totalComplianceFindings",
+    metricsVal("totalComplianceFindings", null)
+  );
+  const complianceFindings =
+    complianceFindingsRaw !== null && complianceFindingsRaw !== "N/A"
+      ? Number(complianceFindingsRaw)
+      : null;
+
+  const supplierEsgCompliance = metricsVal("supplierEsgCompliance", "N/A");
 
   // Build the sections using REAL fields from uploaded ESG data
   const governanceSections = [
@@ -258,6 +276,26 @@ const GovernanceCategory = () => {
     doc.save("AfricaESG_GovernanceMiniReport.pdf");
   };
 
+  // Simple KPI card like other pages
+  const KpiCard = ({ icon, label, value, sub }) => (
+    <div className="flex items-center gap-3 rounded-2xl bg-white border border-amber-100 shadow-sm px-4 py-3 h-full">
+      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-amber-50 text-amber-700 shrink-0">
+        {icon}
+      </div>
+      <div className="leading-tight">
+        <div className="text-xs text-slate-500 uppercase tracking-wide">
+          {label}
+        </div>
+        <div className="text-lg font-semibold text-slate-900">
+          {value ?? "N/A"}
+        </div>
+        {sub && (
+          <div className="text-[11px] text-slate-500 mt-0.5">{sub}</div>
+        )}
+      </div>
+    </div>
+  );
+
   return (
     <div className="min-h-screen bg-lime-50 py-10 font-sans">
       <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
@@ -282,6 +320,32 @@ const GovernanceCategory = () => {
             <span>Generate Report (PDF)</span>
           </button>
         </div>
+
+        {/* KPI summary row – matches Environmental/Social feel */}
+        <section className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <KpiCard
+            icon={<FaBalanceScale size={16} />}
+            label="Overall Governance Status"
+            value={overallGovStatus}
+            sub="Reporting standard / framework"
+          />
+          <KpiCard
+            icon={<FaShieldAlt size={16} />}
+            label="Open Compliance Findings"
+            value={
+              complianceFindings !== null && !Number.isNaN(complianceFindings)
+                ? complianceFindings
+                : "N/A"
+            }
+            sub="From latest ESG upload"
+          />
+          <KpiCard
+            icon={<FaTruck size={16} />}
+            label="Supplier ESG Compliance"
+            value={supplierEsgCompliance}
+            sub="Overall supplier governance status"
+          />
+        </section>
 
         {/* Main Content */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-stretch">
@@ -339,11 +403,11 @@ const GovernanceCategory = () => {
           {/* AI Insights – right column */}
           <div className="bg-white p-5 sm:p-6 rounded-2xl shadow-lg border border-gray-200 flex flex-col lg:sticky lg:top-6">
             <h2 className="text-xl font-semibold text-gray-800 mb-2">
-              AI Mini Report – Governance
+              AI Mini Report – Governance (LIVE)
             </h2>
             <p className="text-xs sm:text-sm text-gray-500 mb-3">
-              Live AI insights from the backend, with fallback to simulation
-              context if needed.
+              Live AI insights from AfricaESG.AI based on your latest
+              governance, ethics, privacy and supply chain metrics.
             </p>
 
             {/* Loading state */}
