@@ -25,10 +25,14 @@ export default function Dashboard() {
   const navigate = useNavigate();
 
   // --- ESG Summary ---
+  // Use full-format placeholders so the ESG Summary card keeps a similar height
   const [esgSummary, setEsGSummary] = useState({
-    environmental: "Loading...",
-    social: "Loading...",
-    governance: "Loading...",
+    environmental:
+      "Energy: -- kWh · Renewables: --% · Carbon: -- tCO₂e",
+    social:
+      "Supplier diversity: --% · Customer satisfaction: --% · Human capital: --%",
+    governance:
+      "Corporate governance: -- · ISO 9001: -- · Ethics: --",
   });
 
   // --- KPI States (financial / carbon) ---
@@ -245,13 +249,13 @@ export default function Dashboard() {
       setEsGSummary({
         environmental: summary.environmental
           ? `Energy: ${summary.environmental.totalEnergyConsumption.toLocaleString()} kWh · Renewables: ${summary.environmental.renewableEnergyShare}% · Carbon: ${summary.environmental.carbonEmissions.toLocaleString()} tCO₂e`
-          : "Data unavailable",
+          : esgSummary.environmental,
         social: summary.social
           ? `Supplier diversity: ${summary.social.supplierDiversity}% · Customer satisfaction: ${summary.social.customerSatisfaction}% · Human capital: ${summary.social.humanCapital}%`
-          : "Data unavailable",
+          : esgSummary.social,
         governance: summary.governance
           ? `Corporate governance: ${summary.governance.corporateGovernance} · ISO 9001: ${summary.governance.iso9001Compliance} · Ethics: ${summary.governance.businessEthics}`
-          : "Data unavailable",
+          : esgSummary.governance,
       });
 
       // update KPI baselines & current values
@@ -371,9 +375,9 @@ export default function Dashboard() {
     } catch (err) {
       console.error("Error fetching ESG data:", err);
       setEsGSummary({
-        environmental: "Data unavailable",
-        social: "Data unavailable",
-        governance: "Data unavailable",
+        environmental: esgSummary.environmental,
+        social: esgSummary.social,
+        governance: esgSummary.governance,
       });
       setAIInsights([]);
       setAiError(
@@ -534,15 +538,19 @@ export default function Dashboard() {
               ESG performance overview with AI-enabled insights on carbon tax,
               energy savings, and strategic ESG levers.
             </p>
-            {aiLoading && (
-              <p className="mt-2 text-xs text-emerald-700 flex items-center gap-2">
-                <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-                Loading ESG metrics and AI insights…
-              </p>
-            )}
-            {aiError && (
-              <p className="mt-2 text-xs text-red-500">{aiError}</p>
-            )}
+
+            {/* Reserve a fixed line for loading/error so header height stays stable */}
+            <div className="mt-2 h-5">
+              {aiLoading && (
+                <p className="text-xs text-emerald-700 flex items-center gap-2">
+                  <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                  Loading ESG metrics and AI insights…
+                </p>
+              )}
+              {!aiLoading && aiError && (
+                <p className="text-xs text-red-500">{aiError}</p>
+              )}
+            </div>
           </div>
 
           <div className="flex flex-wrap gap-3">
@@ -600,7 +608,8 @@ export default function Dashboard() {
                 dataset.
               </p>
 
-              <div className="space-y-2 text-sm text-gray-800 mt-auto">
+              {/* Fixed minimum height so the card doesn't jump when text changes */}
+              <div className="space-y-2 text-sm text-gray-800 mt-auto min-h-[80px]">
                 <p>
                   <span className="font-semibold">Environmental:</span>{" "}
                   {esgSummary.environmental}
