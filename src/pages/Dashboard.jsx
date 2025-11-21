@@ -602,7 +602,7 @@ export default function Dashboard() {
           />
         </section>
 
-        {/* ESG Performance Overview (now includes ESG Summary + AI Mini Report) */}
+        {/* ESG Performance Overview (WITHOUT ESG Summary / AI Mini Report now) */}
         <section>
           <div className="bg-white rounded-2xl shadow-lg border border-gray-200 p-6">
             <div className="flex items-center justify-between mb-4">
@@ -615,110 +615,6 @@ export default function Dashboard() {
               >
                 View detailed ESG metrics →
               </button>
-            </div>
-
-            {/* ESG Summary + AI Mini Report moved here */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-stretch mb-6">
-              {/* ESG Summary card (left, spanning 2 cols on desktop) */}
-              <div className="lg:col-span-2 h-full">
-                <div className="bg-white rounded-2xl shadow-lg border border-gray-200 p-6 h-full flex flex-col">
-                  <div className="flex items-center gap-3 mb-2">
-                    <FaLeaf className="text-green-700 text-xl" />
-                    <h2 className="text-xl sm:text-2xl font-semibold text-gray-800">
-                      ESG Summary
-                    </h2>
-                  </div>
-                  <p className="text-sm text-gray-600 mb-4">
-                    High-level ESG performance snapshot from the latest uploaded
-                    dataset.
-                  </p>
-
-                  {/* Fixed minimum height so the card doesn't jump when text changes */}
-                  <div className="space-y-2 text-sm text-gray-800 mt-auto min-h-[80px]">
-                    <p>
-                      <span className="font-semibold">Environmental:</span>{" "}
-                      {esgSummary.environmental}
-                    </p>
-                    <p>
-                      <span className="font-semibold">Social:</span>{" "}
-                      {esgSummary.social}
-                    </p>
-                    <p>
-                      <span className="font-semibold">Governance:</span>{" "}
-                      {esgSummary.governance}
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              {/* AI Mini Report (right) */}
-              <div className="h-full">
-                <div className="bg-white rounded-2xl shadow-lg border border-gray-200 p-6 h-full flex flex-col">
-                  <h2 className="text-xl font-semibold text-gray-800 mb-2">
-                    AI Mini Report on ESG Summary
-                  </h2>
-                  <p className="text-xs text-gray-500 mb-3">
-                    AI-generated commentary on Environmental, Social and
-                    Governance performance based on the latest ESG upload.
-                  </p>
-
-                  <div className="space-y-4 text-sm flex-1 overflow-y-auto pr-1">
-                    {/* Environmental insights */}
-                    <div>
-                      <h3 className="font-semibold text-emerald-700 mb-1">
-                        Environmental
-                      </h3>
-                      {envInsights && envInsights.length > 0 ? (
-                        <ul className="list-disc list-inside text-gray-700 space-y-1">
-                          {envInsights.map((i, idx) => (
-                            <li key={idx}>{i}</li>
-                          ))}
-                        </ul>
-                      ) : (
-                        <p className="text-xs text-gray-500">
-                          No AI insights generated yet for Environmental.
-                        </p>
-                      )}
-                    </div>
-
-                    {/* Social insights */}
-                    <div>
-                      <h3 className="font-semibold text-sky-700 mb-1">
-                        Social
-                      </h3>
-                      {socialInsights && socialInsights.length > 0 ? (
-                        <ul className="list-disc list-inside text-gray-700 space-y-1">
-                          {socialInsights.map((i, idx) => (
-                            <li key={idx}>{i}</li>
-                          ))}
-                        </ul>
-                      ) : (
-                        <p className="text-xs text-gray-500">
-                          No AI insights generated yet for Social.
-                        </p>
-                      )}
-                    </div>
-
-                    {/* Governance insights */}
-                    <div>
-                      <h3 className="font-semibold text-amber-700 mb-1">
-                        Governance
-                      </h3>
-                      {govInsights && govInsights.length > 0 ? (
-                        <ul className="list-disc list-inside text-gray-700 space-y-1">
-                          {govInsights.map((i, idx) => (
-                            <li key={idx}>{i}</li>
-                          ))}
-                        </ul>
-                      ) : (
-                        <p className="text-xs text-gray-500">
-                          No AI insights generated yet for Governance.
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </div>
             </div>
 
             {/* 3 pillar mini cards */}
@@ -900,6 +796,108 @@ export default function Dashboard() {
                 indicator={renderIndicator(energySavings, prevEnergySavings)}
                 isFlagged={false}
               />
+            </div>
+          </div>
+        </section>
+
+        {/* ESG Summary + AI Mini Report AFTER ESG Performance Overview */}
+        <section className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-stretch">
+          {/* ESG Summary card */}
+          <div className="lg:col-span-2 h-full">
+            <div className="bg-white rounded-2xl shadow-lg border border-gray-200 p-6 h-full flex flex-col">
+              <div className="flex items-center gap-3 mb-2">
+                <FaLeaf className="text-green-700 text-xl" />
+                <h2 className="text-xl sm:text-2xl font-semibold text-gray-800">
+                  ESG Summary
+                </h2>
+              </div>
+              <p className="text-sm text-gray-600 mb-4">
+                High-level ESG performance snapshot from the latest uploaded
+                dataset.
+              </p>
+
+              {/* Fixed height so the card doesn't jump when text changes */}
+              <div className="space-y-2 text-sm text-gray-800 mt-auto min-h-[140px] h-[140px] overflow-hidden">
+                <p>
+                  <span className="font-semibold">Environmental:</span>{" "}
+                  {esgSummary.environmental}
+                </p>
+                <p>
+                  <span className="font-semibold">Social:</span>{" "}
+                  {esgSummary.social}
+                </p>
+                <p>
+                  <span className="font-semibold">Governance:</span>{" "}
+                  {esgSummary.governance}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* AI Mini Report */}
+          <div className="h-full">
+            <div className="bg-white rounded-2xl shadow-lg border border-gray-200 p-6 h-full flex flex-col">
+              <h2 className="text-xl font-semibold text-gray-800 mb-2">
+                AI Mini Report on ESG Summary
+              </h2>
+              <p className="text-xs text-gray-500 mb-3">
+                AI-generated commentary on Environmental, Social and Governance
+                performance based on the latest ESG upload.
+              </p>
+
+              <div className="space-y-4 text-sm flex-1 overflow-y-auto pr-1">
+                {/* Environmental insights */}
+                <div>
+                  <h3 className="font-semibold text-emerald-700 mb-1">
+                    Environmental
+                  </h3>
+                  {envInsights && envInsights.length > 0 ? (
+                    <ul className="list-disc list-inside text-gray-700 space-y-1">
+                      {envInsights.map((i, idx) => (
+                        <li key={idx}>{i}</li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="text-xs text-gray-500">
+                      No AI insights generated yet for Environmental.
+                    </p>
+                  )}
+                </div>
+
+                {/* Social insights */}
+                <div>
+                  <h3 className="font-semibold text-sky-700 mb-1">Social</h3>
+                  {socialInsights && socialInsights.length > 0 ? (
+                    <ul className="list-disc list-inside text-gray-700 space-y-1">
+                      {socialInsights.map((i, idx) => (
+                        <li key={idx}>{i}</li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="text-xs text-gray-500">
+                      No AI insights generated yet for Social.
+                    </p>
+                  )}
+                </div>
+
+                {/* Governance insights */}
+                <div>
+                  <h3 className="font-semibold text-amber-700 mb-1">
+                    Governance
+                  </h3>
+                  {govInsights && govInsights.length > 0 ? (
+                    <ul className="list-disc list-inside text-gray-700 space-y-1">
+                      {govInsights.map((i, idx) => (
+                        <li key={idx}>{i}</li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="text-xs text-gray-500">
+                      No AI insights generated yet for Governance.
+                    </p>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
         </section>
