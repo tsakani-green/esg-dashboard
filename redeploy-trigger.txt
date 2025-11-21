@@ -1,0 +1,1 @@
+Redeploy triggered by GitHub Copilot on 2025-11-21 07:47:38 UTC to apply vercel.json rewrite.
