@@ -1,19 +1,8 @@
 // src/context/SimulationContext.jsx
-import React, { createContext, useCallback, useEffect, useState } from "react";
+import React, { createContext, useEffect, useState } from "react";
+import { API_BASE_URL } from "../config/api";
 
-export const SimulationContext = createContext({
-  environmentalMetrics: null,
-  socialMetrics: null,
-  governanceMetrics: null,
-  environmentalInsights: [],
-  socialInsights: [],
-  governanceInsights: [],
-  loading: false,
-  error: null,
-  refreshAll: () => {},
-});
-
-const API_BASE = "http://localhost:5000";
+export const SimulationContext = createContext(null);
 
 export const SimulationProvider = ({ children }) => {
   const [environmentalMetrics, setEnvironmentalMetrics] = useState(null);
@@ -24,23 +13,31 @@ export const SimulationProvider = ({ children }) => {
   const [socialInsights, setSocialInsights] = useState([]);
   const [governanceInsights, setGovernanceInsights] = useState([]);
 
+  const [companyLogoUrl, setCompanyLogoUrl] = useState(null);
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  // Fetch latest metrics + AI insights from backend (LIVE)
-  const refreshAll = useCallback(async () => {
+  // Reusable loader so other components can trigger a refresh after uploads
+  const loadAll = async () => {
     setLoading(true);
     setError(null);
 
     try {
       const [envRes, socRes, govRes] = await Promise.all([
-        fetch(`${API_BASE}/api/environmental-insights`),
-        fetch(`${API_BASE}/api/social-insights`),
-        fetch(`${API_BASE}/api/governance-insights`),
+        fetch(`${API_BASE_URL}/api/environmental-insights`),
+        fetch(`${API_BASE_URL}/api/social-insights`),
+        fetch(`${API_BASE_URL}/api/governance-insights`),
       ]);
 
-      if (!envRes.ok || !socRes.ok || !govRes.ok) {
-        throw new Error("One or more ESG endpoints returned an error.");
+      if (!envRes.ok) {
+        throw new Error(`/api/environmental-insights ${envRes.status}`);
+      }
+      if (!socRes.ok) {
+        throw new Error(`/api/social-insights ${socRes.status}`);
+      }
+      if (!govRes.ok) {
+        throw new Error(`/api/governance-insights ${govRes.status}`);
       }
 
       const [envData, socData, govData] = await Promise.all([
@@ -49,26 +46,38 @@ export const SimulationProvider = ({ children }) => {
         govRes.json(),
       ]);
 
-      setEnvironmentalMetrics(envData.metrics || null);
+      // Environmental
+      setEnvironmentalMetrics(envData.metrics || {});
       setEnvironmentalInsights(envData.insights || []);
 
-      setSocialMetrics(socData.metrics || null);
+      // Try to discover logo URL from environmental payload
+      const logoFromEnv =
+        envData.companyLogoUrl ||
+        envData.logoUrl ||
+        (envData.metrics && envData.metrics.companyLogoUrl) ||
+        null;
+      setCompanyLogoUrl(logoFromEnv);
+
+      // Social
+      setSocialMetrics(socData.metrics || {});
       setSocialInsights(socData.insights || []);
 
-      setGovernanceMetrics(govData.metrics || null);
+      // Governance
+      setGovernanceMetrics(govData.metrics || {});
       setGovernanceInsights(govData.insights || []);
     } catch (err) {
-      console.error("SimulationContext refreshAll error:", err);
-      setError("Failed to load ESG metrics and AI insights.");
+      console.error("SimulationContext load error:", err);
+      setError(err.message || "Failed to load ESG simulation data.");
     } finally {
       setLoading(false);
     }
-  }, []);
+  };
 
-  // Initial load
+  // Initial load on mount
   useEffect(() => {
-    refreshAll();
-  }, [refreshAll]);
+    loadAll();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <SimulationContext.Provider
@@ -79,9 +88,11 @@ export const SimulationProvider = ({ children }) => {
         environmentalInsights,
         socialInsights,
         governanceInsights,
+        companyLogoUrl,
         loading,
         error,
-        refreshAll,
+        // expose refresh so pages can reload after /api/esg-upload, etc.
+        refreshSimulation: loadAll,
       }}
     >
       {children}

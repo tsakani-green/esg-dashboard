@@ -1,4 +1,9 @@
-import React, { useEffect, useState, useContext, useMemo } from "react";
+import React, {
+  useEffect,
+  useState,
+  useContext,
+  useMemo,
+} from "react";
 import { useNavigate } from "react-router-dom";
 import {
   FaGlobeAfrica,
@@ -13,12 +18,6 @@ import {
   FaTrash,
   FaIndustry,
   FaFilePdf,
-  FaCloudUploadAlt,
-  FaUpload,
-  FaBuilding,
-  FaEdit,
-  FaCheck,
-  FaTimes,
 } from "react-icons/fa";
 import { jsPDF } from "jspdf";
 import { API_BASE_URL } from "../config/api";
@@ -27,23 +26,7 @@ import {
   getLastSixInvoices,
   computeInvoiceEnergyAndCarbon,
 } from "../utils/invoices";
-
-// ---------- Company Name Helper Functions ----------
-const getCompanyNameFromFilename = (filename) => {
-  if (!filename) return "—";
-  let base = filename.replace(/\.[^/.]+$/, "");
-  base = base.replace(/[_-]+/g, " ");
-  base = base.replace(/\b\d{6,}\b/g, "").trim();
-  base = base.replace(/\s+/g, " ").trim();
-  return base || filename;
-};
-
-const getCompanyNameFromInvoice = (inv) => {
-  if (inv && typeof inv.company_name === "string" && inv.company_name.trim()) {
-    return inv.company_name.trim();
-  }
-  return getCompanyNameFromFilename(inv?.filename);
-};
+import africaEsgLogo from "../assets/AfricaESG.AI.png";
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -51,11 +34,6 @@ export default function Dashboard() {
   // Pull simulation data (same used by EnvironmentalCategory)
   const simulation = useContext(SimulationContext);
   const environmentalMetrics = simulation?.environmentalMetrics;
-
-  // --- Company name from uploaded data ---
-  const [companyName, setCompanyName] = useState("");
-  const [isEditingCompany, setIsEditingCompany] = useState(false);
-  const [tempCompanyName, setTempCompanyName] = useState("");
 
   // --- ESG Summary (strings for UI) ---
   const [esgSummary, setEsGSummary] = useState({
@@ -116,218 +94,6 @@ export default function Dashboard() {
 
   // Invoice summaries for dashboard-level energy/carbon baseline
   const [invoiceSummaries, setInvoiceSummaries] = useState([]);
-
-  // Invoice Environmental AI (backend /api/invoice-environmental-insights)
-  const [invoiceEnvMetrics, setInvoiceEnvMetrics] = useState(null);
-  const [invoiceEnvInsights, setInvoiceEnvInsights] = useState([]);
-  const [invoiceEnvError, setInvoiceEnvError] = useState(null);
-
-  // --- Company logo state (from invoices or direct upload) ---
-  const [companyLogo, setCompanyLogo] = useState(null); // data URL base64
-  const [logoLoading, setLogoLoading] = useState(false);
-
-  // State for second logo upload
-  const [secondLogo, setSecondLogo] = useState(null);
-  const [secondLogoLoading, setSecondLogoLoading] = useState(false);
-
-  // ---------- Company Name Management ----------
-  const handleCompanyNameEdit = () => {
-    if (isEditingCompany && tempCompanyName.trim()) {
-      const newName = tempCompanyName.trim();
-      setCompanyName(newName);
-      localStorage.setItem('companyName', newName);
-      setIsEditingCompany(false);
-    } else {
-      setTempCompanyName(companyName || "");
-      setIsEditingCompany(true);
-    }
-  };
-
-  const handleCancelEdit = () => {
-    setIsEditingCompany(false);
-    setTempCompanyName("");
-  };
-
-  const handleCompanyNameSave = async () => {
-    if (!tempCompanyName.trim()) return;
-    
-    const newName = tempCompanyName.trim();
-    setCompanyName(newName);
-    localStorage.setItem('companyName', newName);
-    
-    // Optionally save to backend
-    try {
-      await fetch(`${API_BASE_URL}/api/company-name`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ company_name: newName }),
-      });
-    } catch (error) {
-      console.warn('Failed to save company name to backend:', error);
-    }
-    
-    setIsEditingCompany(false);
-  };
-
-  // ---------- Enhanced Extract Company Name Function ----------
-  const extractCompanyName = () => {
-    // Try multiple sources for company name
-    
-    // 1. From local storage (user might have set it)
-    const savedCompany = localStorage.getItem('companyName');
-    if (savedCompany && savedCompany.trim() && savedCompany.trim() !== "Company Name") {
-      return savedCompany.trim();
-    }
-    
-    // 2. From summary data (already set in applySnapshotFromBackend)
-    if (summaryData.company_name && summaryData.company_name.trim() && 
-        summaryData.company_name.trim() !== "Company Name") {
-      return summaryData.company_name.trim();
-    }
-    
-    // 3. From uploaded ESG rows in SimulationContext
-    if (environmentalMetrics?.uploadedRows?.length > 0) {
-      const rows = environmentalMetrics.uploadedRows;
-      
-      // Look for common company-related columns
-      const sampleRow = rows[0] || {};
-      
-      // Look for columns containing company-related keywords
-      const companyColumns = [];
-      Object.keys(sampleRow).forEach(key => {
-        const lowerKey = key.toLowerCase();
-        if (lowerKey.includes('company') || 
-            lowerKey.includes('org') ||
-            lowerKey.includes('client') ||
-            lowerKey.includes('customer') ||
-            lowerKey.includes('entity') ||
-            lowerKey.includes('facility') ||
-            lowerKey.includes('site') ||
-            lowerKey.includes('name') && !lowerKey.includes('filename') && !lowerKey.includes('file')) {
-          companyColumns.push(key);
-        }
-      });
-      
-      // Check each potential company column
-      for (const col of companyColumns) {
-        for (const row of rows) {
-          if (row[col] && typeof row[col] === 'string') {
-            const value = row[col].trim();
-            if (value && value !== "—" && value.length > 2 && value !== "Company Name") {
-              // Additional validation: check if it looks like a company name
-              if (!/^\d+$/.test(value) && // Not just numbers
-                  !/\d{4}-\d{2}-\d{2}/.test(value) && // Not a date
-                  !/invoice|bill|receipt|payment|statement/i.test(value)) { // Not invoice-related
-                return value;
-              }
-            }
-          }
-        }
-      }
-      
-      // If no company column found, look for any non-data string
-      for (const row of rows) {
-        for (const key in row) {
-          const value = row[key];
-          if (typeof value === 'string' && value.trim().length > 3) {
-            const lowerKey = key.toLowerCase();
-            const lowerValue = value.toLowerCase().trim();
-            
-            // Skip obvious non-company fields
-            const excludeKeys = [
-              'date', 'month', 'kwh', 'energy', 'carbon', 'co2', 
-              'waste', 'fuel', 'period', 'year', 'quarter', 'day',
-              'time', 'amount', 'cost', 'price', 'value', 'number',
-              'id', 'code', 'reference', 'no', '#', 'index', 'seq',
-              'electricity', 'water', 'emission', 'consumption',
-              'usage', 'meter', 'reading', 'tariff', 'rate', 'invoice',
-              'bill', 'total', 'tax', 'vat', 'address', 'email', 'phone'
-            ];
-            
-            const excludeValues = [
-              'jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec',
-              'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday',
-              'q1', 'q2', 'q3', 'q4', 'yes', 'no', 'true', 'false'
-            ];
-            
-            const isExcludedKey = excludeKeys.some(keyword => lowerKey.includes(keyword));
-            const isExcludedValue = excludeValues.some(keyword => lowerValue.includes(keyword));
-            
-            if (!isExcludedKey && !isExcludedValue && 
-                !/^\d+$/.test(value.trim()) && // Not just numbers
-                !/\d{4}-\d{2}-\d{2}/.test(value.trim()) && // Not a date
-                !/\d{2}\/\d{2}\/\d{4}/.test(value.trim()) && // Not a date
-                value.trim() !== "Company Name" &&
-                value.trim() !== "—") {
-              
-              // Check if it looks like a proper name
-              if (/[a-zA-Z]/.test(value) && value.trim().length > 2) {
-                return value.trim();
-              }
-            }
-          }
-        }
-      }
-    }
-    
-    // 4. Check invoice data
-    if (invoiceSummaries.length > 0) {
-      for (const invoice of invoiceSummaries) {
-        // Check multiple possible fields in the invoice
-        const possibleFields = [
-          invoice.company_name,
-          invoice.company,
-          invoice.client_name,
-          invoice.customer_name,
-          invoice.account_name,
-          invoice.bill_to,
-          invoice.client,
-          invoice.customer
-        ];
-        
-        for (const field of possibleFields) {
-          if (field && typeof field === 'string' && 
-              field.trim() && 
-              field.trim() !== "Company Name" &&
-              field.trim().length > 2) {
-            return field.trim();
-          }
-        }
-        
-        // Also try the filename-based extraction
-        const invoiceCompanyName = getCompanyNameFromInvoice(invoice);
-        if (invoiceCompanyName && 
-            invoiceCompanyName !== "—" && 
-            invoiceCompanyName.toLowerCase() !== "unknown" &&
-            invoiceCompanyName !== "Company Name" &&
-            invoiceCompanyName.length > 2) {
-          return invoiceCompanyName;
-        }
-      }
-    }
-    
-    // 5. Check if environmentalMetrics has company_name directly
-    if (environmentalMetrics?.company_name && 
-        typeof environmentalMetrics.company_name === 'string' &&
-        environmentalMetrics.company_name.trim() &&
-        environmentalMetrics.company_name.trim() !== "Company Name") {
-      return environmentalMetrics.company_name.trim();
-    }
-    
-    return "";
-  };
-
-  // ---------- Load company name from uploaded data ----------
-  useEffect(() => {
-    const name = extractCompanyName();
-    if (name) {
-      setCompanyName(name);
-      // Save to local storage for persistence
-      localStorage.setItem('companyName', name);
-    }
-  }, [summaryData, environmentalMetrics, invoiceSummaries]);
 
   // ---------- Trend indicator ----------
   const renderIndicator = (current, previous) => {
@@ -474,11 +240,6 @@ export default function Dashboard() {
 
     // keep structured
     setSummaryData(summary);
-
-    // Extract company name from summary data if available
-    if (summary.company_name) {
-      setCompanyName(summary.company_name);
-    }
 
     // string-based summary (we'll override Environmental at render with invoice-aware values)
     setEsGSummary({
@@ -663,148 +424,6 @@ export default function Dashboard() {
     loadInvoices();
   }, []);
 
-  // Load invoice-derived Environmental insights & metrics
-  useEffect(() => {
-    const loadInvoiceEnvInsights = async () => {
-      setInvoiceEnvError(null);
-      try {
-        const res = await fetch(
-          API_BASE_URL + "/api/invoice-environmental-insights?last_n=6"
-        );
-        if (!res.ok) {
-          if (res.status === 404) return; // no invoices yet
-          const txt = await res.text();
-          throw new Error(
-            "/api/invoice-environmental-insights error: " +
-              res.status +
-              " " +
-              txt
-          );
-        }
-
-        const data = await res.json();
-        const metrics = data.metrics || null;
-        const insights = data.insights || [];
-
-        setInvoiceEnvMetrics(metrics);
-        setInvoiceEnvInsights(insights);
-
-        // Merge invoice-specific insights into global AI insights, avoiding duplicates
-        if (insights && insights.length > 0) {
-          setAIInsights((prev) => {
-            const base = Array.isArray(prev) ? prev : [];
-            const existing = new Set(base);
-            const merged = [...base];
-            insights.forEach((line) => {
-              if (!existing.has(line)) {
-                merged.push(line);
-                existing.add(line);
-              }
-            });
-            return merged;
-          });
-        }
-      } catch (err) {
-        console.warn("Invoice Environmental insights error:", err);
-        setInvoiceEnvError(
-          err.message ||
-            "Failed to load invoice-derived Environmental AI insights."
-        );
-      }
-    };
-
-    loadInvoiceEnvInsights();
-  }, []);
-
-  // --- Load company logo from backend/localStorage ---
-  useEffect(() => {
-    const loadCompanyLogo = async () => {
-      setLogoLoading(true);
-      try {
-        const response = await fetch(`${API_BASE_URL}/api/company-logo`);
-        if (response.ok) {
-          const data = await response.json();
-          if (data.success && data.logo) {
-            setCompanyLogo(data.logo);
-            localStorage.setItem("companyLogo", data.logo);
-          }
-        } else {
-          // fallback to localStorage
-          const savedLogo = localStorage.getItem("companyLogo");
-          if (savedLogo) {
-            setCompanyLogo(savedLogo);
-          }
-        }
-      } catch (error) {
-        console.warn("Failed to load company logo:", error);
-        const savedLogo = localStorage.getItem("companyLogo");
-        if (savedLogo) {
-          setCompanyLogo(savedLogo);
-        }
-      } finally {
-        setLogoLoading(false);
-      }
-    };
-
-    loadCompanyLogo();
-  }, []);
-
-  // --- Logo upload handler (PDF, PNG, JPG, etc.) ---
-  const handleLogoUpload = async (event, isSecondLogo = false) => {
-    const file = event.target.files[0];
-    if (!file) return;
-
-    if (isSecondLogo) {
-      setSecondLogoLoading(true);
-    } else {
-      setLogoLoading(true);
-    }
-
-    const formData = new FormData();
-    formData.append("file", file);
-
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/upload-logo`, {
-        method: "POST",
-        body: formData,
-      });
-
-      const data = await response.json();
-      if (data.success && data.logo) {
-        if (isSecondLogo) {
-          setSecondLogo(data.logo);
-          localStorage.setItem("secondLogo", data.logo);
-          alert("Second logo uploaded successfully!");
-        } else {
-          setCompanyLogo(data.logo);
-          localStorage.setItem("companyLogo", data.logo);
-          alert("Logo uploaded successfully!");
-        }
-      } else {
-        alert(data.detail || "Failed to extract logo from file");
-      }
-    } catch (error) {
-      console.error("Error uploading logo:", error);
-      alert("Failed to upload logo");
-    } finally {
-      if (isSecondLogo) {
-        setSecondLogoLoading(false);
-      } else {
-        setLogoLoading(false);
-      }
-      // Reset the file input so user can re-upload same file if needed
-      event.target.value = "";
-    }
-  };
-
-  // --- Load second logo from localStorage ---
-  useEffect(() => {
-    const savedSecondLogo = localStorage.getItem("secondLogo");
-    if (savedSecondLogo) {
-      setSecondLogo(savedSecondLogo);
-    }
-  }, []);
-
   // Last 6 invoices & aggregated energy/carbon (from uploaded invoices)
   const lastSixInvoices = useMemo(
     () => getLastSixInvoices(invoiceSummaries),
@@ -911,249 +530,109 @@ export default function Dashboard() {
     );
   }, [dashboardEnergyKWh, dashboardCarbonTonnes, envSummaryData]);
 
-  // ---- Download ESG Report (PDF) with logo from uploads ----
+  // ---- Download ESG Report (PDF) ----
   const handleGenerateReport = () => {
-    // Create jsPDF instance
     const doc = new jsPDF();
 
-    // Page dimensions
-    const pageWidth = doc.internal.pageSize.getWidth();
-    const pageHeight = doc.internal.pageSize.getHeight();
+    const buildPdfBody = (startY) => {
+      let y = startY;
 
-    // Add company logo if available
-    if (companyLogo) {
-      try {
-        // Convert base64 to image data (strip "data:image/png;base64," etc.)
-        const logoData = companyLogo.replace(/^data:image\/\w+;base64,/, "");
-
-        // Add company logo at top-left
-        doc.addImage(logoData, "PNG", 14, 10, 40, 40);
-
-        // Add second logo if available (top-right)
-        if (secondLogo) {
-          try {
-            const secondLogoData = secondLogo.replace(/^data:image\/\w+;base64,/, "");
-            doc.addImage(secondLogoData, "PNG", pageWidth - 40, 25, 25, 25);
-          } catch (error) {
-            console.warn("Failed to add second logo to PDF:", error);
-          }
-        }
-
-        // Report title
-        doc.setFontSize(16);
-        doc.setFont("helvetica", "bold");
-        doc.text("ESG Performance Report", pageWidth / 2, 25, {
-          align: "center",
-        });
-
-        // Subtitle
-        doc.setFontSize(10);
-        doc.setFont("helvetica", "normal");
-        doc.text(
-          "Generated by AfricaESG.AI Platform",
-          pageWidth / 2,
-          32,
-          { align: "center" }
-        );
-      } catch (error) {
-        console.warn("Failed to add logo to PDF:", error);
-        // Fallback: Add text header only
-        doc.setFontSize(20);
-        doc.setFont("helvetica", "bold");
-        doc.text("AfricaESG.AI Overview Report", 14, 20);
-      }
-    } else {
-      // No logo - use text header
+      // Title
+      doc.setFont("helvetica", "bold");
       doc.setFontSize(20);
-      doc.setFont("helvetica", "bold");
-      doc.text("AfricaESG.AI Overview Report", 14, 20);
-    }
+      doc.text("AfricaESG.AI Overview Report", 14, y);
 
-    // Report date
-    doc.setFontSize(10);
-    doc.setFont("helvetica", "normal");
-    doc.text(
-      `Generated: ${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}`,
-      pageWidth - 14,
-      20,
-      { align: "right" }
-    );
-
-    // Add a horizontal line
-    doc.setDrawColor(200, 200, 200);
-    const headerBottomY = companyLogo ? 55 : 30;
-    doc.line(14, headerBottomY, pageWidth - 14, headerBottomY);
-
-    let yPosition = companyLogo ? 65 : 40;
-
-    // Company Information Section - FIXED: Use extracted companyName
-    doc.setFontSize(14);
-    doc.setFont("helvetica", "bold");
-    doc.text("Company Information", 14, yPosition);
-    yPosition += 8;
-
-    doc.setFontSize(11);
-    doc.setFont("helvetica", "normal");
-
-    // FIXED: Use the actual companyName from state
-    const reportCompanyName = companyName || 
-      (environmentalMetrics?.uploadedRows?.[0]?.company_name) ||
-      (invoiceSummaries.length > 0 && getCompanyNameFromInvoice(invoiceSummaries[0])) ||
-      summaryData.company_name ||
-      "Company Name"; // Last resort fallback
-
-    doc.text(`Company: ${reportCompanyName}`, 14, yPosition);
-    yPosition += 7;
-    doc.text(`Report Period: ${new Date().getFullYear()}`, 14, yPosition);
-    yPosition += 10;
-
-    // ESG Summary Section
-    doc.setFontSize(14);
-    doc.setFont("helvetica", "bold");
-    doc.text("ESG Performance Summary", 14, yPosition);
-    yPosition += 8;
-
-    doc.setFontSize(11);
-    doc.setFont("helvetica", "normal");
-
-    // Environmental
-    const envEnergyText =
-      dashboardEnergyKWh != null
-        ? `${dashboardEnergyKWh.toLocaleString()} kWh`
-        : "-- kWh";
-    const envRenewablesText =
-      envSummaryData.renewableEnergyShare != null
-        ? `${envSummaryData.renewableEnergyShare}%`
-        : "--%";
-    const envCarbonText =
-      dashboardCarbonTonnes != null
-        ? `${dashboardCarbonTonnes.toLocaleString()} tCO₂e`
-        : "-- tCO₂e";
-
-    doc.text("Environmental:", 14, yPosition);
-    yPosition += 6;
-    doc.setFontSize(10);
-    doc.text(`• Energy Consumption: ${envEnergyText}`, 20, yPosition);
-    yPosition += 5;
-    doc.text(`• Renewable Energy: ${envRenewablesText}`, 20, yPosition);
-    yPosition += 5;
-    doc.text(`• Carbon Emissions: ${envCarbonText}`, 20, yPosition);
-    yPosition += 8;
-
-    // Social
-    doc.setFontSize(11);
-    doc.text("Social:", 14, yPosition);
-    yPosition += 6;
-    doc.setFontSize(10);
-    doc.text(
-      `• Supplier Diversity: ${
-        socSummaryData.supplierDiversity != null
-          ? `${socSummaryData.supplierDiversity}%`
-          : "--"
-      }`,
-      20,
-      yPosition
-    );
-    yPosition += 5;
-    doc.text(
-      `• Customer Satisfaction: ${
-        socSummaryData.customerSatisfaction != null
-          ? `${socSummaryData.customerSatisfaction}%`
-          : "--"
-      }`,
-      20,
-      yPosition
-    );
-    yPosition += 8;
-
-    // Governance
-    doc.setFontSize(11);
-    doc.text("Governance:", 14, yPosition);
-    yPosition += 6;
-    doc.setFontSize(10);
-    doc.text(
-      `• Corporate Governance: ${
-        govSummaryData.corporateGovernance || "--"
-      }`,
-      20,
-      yPosition
-    );
-    yPosition += 5;
-    doc.text(
-      `• ISO 9001 Compliance: ${
-        govSummaryData.iso9001Compliance || "--"
-      }`,
-      20,
-      yPosition
-    );
-    yPosition += 10;
-
-    // Financial KPIs
-    doc.setFontSize(14);
-    doc.setFont("helvetica", "bold");
-    doc.text("Financial & Carbon KPIs", 14, yPosition);
-    yPosition += 8;
-
-    doc.setFontSize(10);
-    doc.setFont("helvetica", "normal");
-    doc.text(
-      `• Carbon Tax Exposure: R ${carbonTax.toLocaleString()}`,
-      20,
-      yPosition
-    );
-    yPosition += 5;
-    doc.text(
-      `• Tax Allowances: R ${taxAllowances.toLocaleString()}`,
-      20,
-      yPosition
-    );
-    yPosition += 5;
-    doc.text(
-      `• Carbon Credits: ${carbonCredits.toLocaleString()} tonnes`,
-      20,
-      yPosition
-    );
-    yPosition += 5;
-    doc.text(
-      `• Energy Savings: ${energySavings.toLocaleString()} kWh`,
-      20,
-      yPosition
-    );
-    yPosition += 10;
-
-    // AI Insights Section
-    if (aiInsights && aiInsights.length > 0) {
-      doc.setFontSize(14);
-      doc.setFont("helvetica", "bold");
-      doc.text("AI Analyst Insights", 14, yPosition);
-      yPosition += 8;
-
-      doc.setFontSize(10);
+      y += 10;
       doc.setFont("helvetica", "normal");
+      doc.setFontSize(12);
+      doc.text(
+        "Generated: " + new Date().toLocaleDateString(),
+        14,
+        y
+      );
 
-      // Add insights (limit to first 5 to fit on page)
-      aiInsights.slice(0, 5).forEach((insight) => {
-        if (yPosition > pageHeight - 20) {
-          doc.addPage();
-          yPosition = 20;
-        }
+      // Build ESG summary text for PDF – environmental uses invoice data if available
+      const envEnergyText =
+        dashboardEnergyKWh != null
+          ? dashboardEnergyKWh.toLocaleString() + " kWh"
+          : "-- kWh";
+      const envRenewablesText =
+        envSummaryData.renewableEnergyShare != null
+          ? envSummaryData.renewableEnergyShare + "%"
+          : "--%";
+      const envCarbonText =
+        dashboardCarbonTonnes != null
+          ? dashboardCarbonTonnes.toLocaleString() + " tCO₂e"
+          : "-- tCO₂e";
 
-        const lines = doc.splitTextToSize(`• ${insight}`, pageWidth - 28);
-        doc.text(lines, 20, yPosition);
-        yPosition += lines.length * 5;
+      const pdfEsgSummary = {
+        Environmental:
+          "Energy: " +
+          envEnergyText +
+          " · Renewables: " +
+          envRenewablesText +
+          " · Carbon: " +
+          envCarbonText,
+        Social: esgSummary.social,
+        Governance: esgSummary.governance,
+      };
+
+      y += 10;
+      doc.setFontSize(12);
+      doc.text("ESG Summary:", 14, y);
+      doc.setFontSize(11);
+      y += 8;
+
+      Object.entries(pdfEsgSummary).forEach(([key, value]) => {
+        const lines = doc.splitTextToSize(key + ": " + value, 180);
+        doc.text(lines, 14, y);
+        y += lines.length * 6;
       });
-    }
 
-    // Save the PDF
-    const filename = reportCompanyName && reportCompanyName !== "Company Name"
-      ? `${reportCompanyName.replace(/[^a-z0-9]/gi, "_")}_ESG_Report_${
-          new Date().toISOString().split("T")[0]
-        }.pdf`
-      : `AfricaESG_Report_${
-          new Date().toISOString().split("T")[0]
-        }.pdf`;
+      y += 10;
+      doc.setFontSize(12);
+      doc.text("AI Analyst Summary:", 14, y);
+      doc.setFontSize(11);
+      y += 8;
 
-    doc.save(filename);
+      if (!aiInsights || aiInsights.length === 0) {
+        const lines = doc.splitTextToSize(
+          "No AI analyst insights available yet.",
+          180
+        );
+        doc.text(lines, 14, y);
+        y += lines.length * 6;
+      } else {
+        aiInsights.forEach((note) => {
+          const lines = doc.splitTextToSize("• " + note, 180);
+          doc.text(lines, 14, y);
+          y += lines.length * 6;
+        });
+      }
+    };
+
+    const img = new Image();
+    img.src = africaEsgLogo;
+
+    img.onload = () => {
+      // Add logo at top-left
+      doc.addImage(img, "PNG", 14, 10, 40, 40);
+
+      // Start content below logo
+      const startY = 35;
+      buildPdfBody(startY);
+
+      doc.save("AfricaESG_Overview_Report.pdf");
+    };
+
+    img.onerror = () => {
+      console.warn(
+        "Failed to load AfricaESG.AI logo, generating PDF without logo"
+      );
+      const startY = 20;
+      buildPdfBody(startY);
+      doc.save("AfricaESG_Overview_Report.pdf");
+    };
   };
 
   // ---- Small helper components ----
@@ -1215,70 +694,7 @@ export default function Dashboard() {
             <h1 className="text-3xl sm:text-4xl font-extrabold text-green-900 tracking-tight">
               AfricaESG.AI Dashboard
             </h1>
-            
-            {/* Company Name Display - UPDATED: Removed the explanatory text */}
-            <div className="mt-1 mb-3">
-              {isEditingCompany ? (
-                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 p-3 bg-white rounded-lg border border-emerald-200 shadow-sm">
-                  <div className="flex items-center gap-2">
-                    <FaBuilding className="text-gray-500" />
-                    <input
-                      type="text"
-                      value={tempCompanyName}
-                      onChange={(e) => setTempCompanyName(e.target.value)}
-                      className="px-3 py-1.5 border border-gray-300 rounded text-lg font-semibold text-gray-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                      placeholder="Enter company name"
-                      autoFocus
-                      style={{ minWidth: "250px" }}
-                    />
-                  </div>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={handleCompanyNameSave}
-                      className="px-3 py-1.5 bg-emerald-600 text-white rounded hover:bg-emerald-700 text-sm font-medium flex items-center gap-1"
-                      disabled={!tempCompanyName.trim()}
-                    >
-                      <FaCheck size={12} />
-                      Save
-                    </button>
-                    <button
-                      onClick={handleCancelEdit}
-                      className="px-3 py-1.5 bg-gray-300 text-gray-700 rounded hover:bg-gray-400 text-sm font-medium flex items-center gap-1"
-                    >
-                      <FaTimes size={12} />
-                      Cancel
-                    </button>
-                  </div>
-                </div>
-              ) : companyName ? (
-                <div className="flex items-center gap-2 p-2 hover:bg-white/50 rounded-lg transition-colors">
-                  <FaBuilding className="text-gray-500" />
-                  <div className="flex items-center gap-3">
-                    <span className="text-lg font-semibold text-gray-700">{companyName}</span>
-                    <button
-                      onClick={handleCompanyNameEdit}
-                      className="text-gray-400 hover:text-emerald-600 transition-colors"
-                      title="Edit company name"
-                    >
-                      <FaEdit size={14} />
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <div className="flex items-center gap-2 p-2">
-                  <FaBuilding className="text-gray-400" />
-                  <button
-                    onClick={handleCompanyNameEdit}
-                    className="text-gray-500 hover:text-emerald-600 text-sm font-medium flex items-center gap-1"
-                  >
-                    <span>Set Company Name</span>
-                    <FaEdit size={12} />
-                  </button>
-                </div>
-              )}
-            </div>
-            
-            <p className="text-sm text-gray-600 max-w-xl">
+            <p className="mt-2 text-sm text-gray-600 max-w-xl">
               ESG performance overview with AI-enabled insights on carbon tax,
               energy savings, and strategic ESG levers. Baselines are derived
               from your latest uploaded ESG dataset and electricity invoices.
@@ -1296,46 +712,16 @@ export default function Dashboard() {
                   {aiError || pillarAiError}
                 </p>
               )}
-              {!aiLoading &&
-                !pillarAiLoading &&
-                !aiError &&
-                !pillarAiError &&
-                invoiceEnvError && (
-                  <p className="text-[11px] text-amber-600">
-                    {invoiceEnvError}
-                  </p>
-                )}
             </div>
           </div>
 
-          {/* Hidden file inputs - logo uploads are hidden */}
-          <div className="hidden">
-            <input
-              type="file"
-              id="logo-upload"
-              accept=".pdf,.png,.jpg,.jpeg,.gif,.bmp,.tiff,.webp"
-              onChange={(e) => handleLogoUpload(e, false)}
-              className="hidden"
-            />
-            <input
-              type="file"
-              id="second-logo-upload"
-              accept=".pdf,.png,.jpg,.jpeg,.gif,.bmp,.tiff,.webp"
-              onChange={(e) => handleLogoUpload(e, true)}
-              className="hidden"
-            />
-          </div>
-
-          {/* Only Download button is visible - upload buttons are hidden */}
-          <div className="flex items-center gap-3">
-            <button
-              onClick={handleGenerateReport}
-              className="bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2.5 rounded-full shadow flex items-center gap-2 text-sm font-semibold"
-            >
-              <FaFilePdf />
-              Download ESG Report
-            </button>
-          </div>
+          <button
+            onClick={handleGenerateReport}
+            className="bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2.5 rounded-full shadow flex items-center gap-2 text-sm font-semibold"
+          >
+            <FaFilePdf />
+            Download ESG Report
+          </button>
         </header>
 
         {/* Red Flag Panel */}
@@ -1390,37 +776,6 @@ export default function Dashboard() {
               <h2 className="text-xl sm:text-2xl font-semibold text-gray-800">
                 ESG Performance Overview
               </h2>
-              
-              {/* Company Information Section (hidden on dashboard) */}
-              <div className="hidden">
-                {/* This section is hidden on dashboard but will appear in PDF */}
-                <div className="flex items-center gap-3">
-                  <div className="text-right">
-                    <div className="text-sm font-semibold text-gray-700">
-                      Company: {companyName || "Company Name"}
-                    </div>
-                    <div className="text-xs text-gray-500">
-                      Report Period: {new Date().getFullYear()}
-                    </div>
-                  </div>
-                  
-                  {/* Second Logo Preview (smaller size) */}
-                  {secondLogo && (
-                    <div className="flex flex-col items-center gap-1">
-                      <div className="relative group">
-                        <img
-                          src={secondLogo}
-                          alt="Second Logo"
-                          className="w-8 h-8 rounded-lg border border-gray-200 shadow-sm object-contain bg-white"
-                        />
-                        <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-1 hidden group-hover:block bg-gray-800 text-white text-xs rounded py-1 px-2 whitespace-nowrap">
-                          Second Logo
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
             </div>
 
             {/* Pillar cards */}

@@ -1,3 +1,4 @@
+// src/pages/environment/Coal.jsx
 import React, { useContext, useEffect, useState } from "react";
 import { Line } from "react-chartjs-2";
 import {
@@ -12,6 +13,7 @@ import {
 import { FaFilePdf, FaIndustry } from "react-icons/fa";
 import { jsPDF } from "jspdf";
 import { SimulationContext } from "../../context/SimulationContext";
+import AIInsightPanel from "../../components/AIInsightPanel";
 
 ChartJS.register(
   LineElement,
@@ -21,8 +23,6 @@ ChartJS.register(
   Tooltip,
   Legend
 );
-
-const API_BASE_URL = "https://esg-backend-beige.vercel.app";
 
 export default function Coal() {
   const {
@@ -38,10 +38,7 @@ export default function Coal() {
   const [intensityValues, setIntensityValues] = useState(
     new Array(12).fill(0)
   );
-
   const [topInsights, setTopInsights] = useState([]);
-  const [aiLoading, setAiLoading] = useState(false);
-  const [aiError, setAiError] = useState(null);
 
   const monthlyLabels = [
     "Jan-24",
@@ -94,73 +91,15 @@ export default function Coal() {
       setEmissionValues(new Array(12).fill(0));
       setIntensityValues(new Array(12).fill(0));
     }
-  }, [environmentalMetrics]);
 
-  // ---------- Real AI insights (live) with fallback ----------
-  useEffect(() => {
-    const topicKeywords = ["coal", "thermal", "combustion", "emission", "ghg"];
+    const insights =
+      environmentalInsights && environmentalInsights.length > 0
+        ? environmentalInsights.slice(0, 5)
+        : [];
+    setTopInsights(insights);
+  }, [environmentalMetrics, environmentalInsights]);
 
-    const matchesTopic = (text = "") => {
-      const lower = String(text).toLowerCase();
-      return topicKeywords.some((kw) => lower.includes(kw));
-    };
-
-    const loadInsights = async () => {
-      try {
-        setAiLoading(true);
-        setAiError(null);
-
-        const res = await fetch(`${API_BASE_URL}/api/environmental-insights`);
-        if (!res.ok) {
-          throw new Error(`HTTP ${res.status} ${res.statusText}`);
-        }
-
-        const data = await res.json();
-        const incoming = Array.isArray(data.insights)
-          ? data.insights
-          : data.insights
-          ? [data.insights]
-          : [];
-
-        const filtered = incoming.filter(matchesTopic);
-
-        if (filtered.length > 0) {
-          setTopInsights(filtered.slice(0, 5));
-        } else if (Array.isArray(environmentalInsights)) {
-          const fallbackFiltered = environmentalInsights.filter(matchesTopic);
-          setTopInsights(
-            (fallbackFiltered.length > 0
-              ? fallbackFiltered
-              : environmentalInsights
-            ).slice(0, 5)
-          );
-        } else {
-          setTopInsights([]);
-        }
-
-        setAiLoading(false);
-      } catch (err) {
-        console.error("Error loading coal AI insights:", err);
-        if (Array.isArray(environmentalInsights)) {
-          setTopInsights(environmentalInsights.slice(0, 5));
-        } else {
-          setTopInsights([]);
-        }
-        setAiError("Failed to load live AI insights for coal.");
-        setAiLoading(false);
-      }
-    };
-
-    loadInsights();
-  }, [environmentalInsights]);
-
-  // ---------- AI-style baseline / benchmark ----------
-  const formatNumber = (value, decimals = 1) => {
-    if (value === null || value === undefined || Number.isNaN(value)) {
-      return "N/A";
-    }
-    return Number(value).toFixed(decimals);
-  };
+  // ---------- AI-style baseline / benchmark like Water/Waste ----------
 
   const nonZeroIntensities = intensityValues.filter((v) => v > 0);
 
@@ -207,8 +146,6 @@ export default function Coal() {
         backgroundColor: "rgba(51,65,85,0.18)",
         tension: 0.35,
         pointRadius: 3,
-        pointHoverRadius: 5,
-        fill: true,
       },
       {
         label: "CO₂ Emissions (tCO₂e)",
@@ -217,8 +154,6 @@ export default function Coal() {
         backgroundColor: "rgba(249,115,22,0.18)",
         tension: 0.35,
         pointRadius: 3,
-        pointHoverRadius: 5,
-        fill: true,
       },
     ],
   };
@@ -233,8 +168,6 @@ export default function Coal() {
         backgroundColor: "rgba(34,197,94,0.18)",
         tension: 0.35,
         pointRadius: 3,
-        pointHoverRadius: 5,
-        fill: true,
       },
     ],
   };
@@ -308,16 +241,10 @@ export default function Coal() {
               Understand the relationship between coal usage and associated
               CO₂ emissions, including intensity per tonne of coal.
             </p>
-            {loading && (
+            {(loading) && (
               <p className="mt-2 text-xs text-slate-700 flex items-center gap-2">
                 <span className="h-2 w-2 rounded-full bg-slate-500 animate-pulse" />
-                Loading coal metrics…
-              </p>
-            )}
-            {aiLoading && !loading && (
-              <p className="mt-1 text-xs text-slate-700 flex items-center gap-2">
-                <span className="h-2 w-2 rounded-full bg-slate-500 animate-pulse" />
-                Loading live AI insights…
+                Loading coal metrics and AI insights…
               </p>
             )}
             {error && (
@@ -416,7 +343,6 @@ export default function Coal() {
                     data={coalData}
                     options={{
                       maintainAspectRatio: false,
-                      interaction: { mode: "index", intersect: false },
                       plugins: {
                         legend: {
                           position: "bottom",
@@ -453,7 +379,6 @@ export default function Coal() {
                     data={intensityData}
                     options={{
                       maintainAspectRatio: false,
-                      interaction: { mode: "index", intersect: false },
                       plugins: {
                         legend: {
                           position: "bottom",
@@ -474,120 +399,18 @@ export default function Coal() {
             </div>
 
             {/* AI baseline / benchmark / comparison / recommendations */}
-            <div className="bg-white rounded-2xl shadow-lg border border-slate-100/80 p-6 flex flex-col">
-              <div className="flex items-center justify-between mb-2">
-                <h2 className="text-xl font-semibold text-gray-800">
-                  AI Analysis – Coal Emissions
-                </h2>
-                <span className="inline-flex items-center gap-1 rounded-full bg-slate-50 px-3 py-1 text-[11px] font-semibold text-slate-700 uppercase tracking-wide">
-                  <span className="h-2 w-2 rounded-full bg-slate-500 animate-pulse" />
-                  Live AI
-                </span>
-              </div>
-              <p className="text-xs text-gray-500 mb-3">
-                Baseline, benchmark and performance vs target for coal-related
-                carbon intensity, plus AI recommendations.
-              </p>
-
-              {aiError && (
-                <p className="text-xs text-red-500 mb-2">{aiError}</p>
-              )}
-
-              {/* 1. Baseline */}
-              <div className="mb-4">
-                <h3 className="text-sm font-semibold text-gray-700 mb-1">
-                  1. Baseline
-                </h3>
-                {baselineIntensity == null ? (
-                  <p className="text-xs text-gray-500">
-                    Upload at least one month of coal and emissions data to
-                    establish a baseline coal intensity.
-                  </p>
-                ) : (
-                  <p className="text-sm text-gray-700">
-                    Average early-period coal carbon intensity is{" "}
-                    <span className="font-semibold">
-                      {formatNumber(baselineIntensity)} tCO₂e/t coal
-                    </span>
-                    , based on the first non-zero months in your dataset.
-                  </p>
-                )}
-              </div>
-
-              {/* 2. Benchmark */}
-              <div className="mb-4">
-                <h3 className="text-sm font-semibold text-gray-700 mb-1">
-                  2. Benchmark
-                </h3>
-                {benchmarkIntensityRaw == null ? (
-                  <p className="text-xs text-gray-500">
-                    No benchmark provided yet. The baseline is currently used as
-                    a proxy benchmark for coal intensity.
-                  </p>
-                ) : (
-                  <p className="text-sm text-gray-700">
-                    Target / benchmark coal intensity is{" "}
-                    <span className="font-semibold">
-                      {formatNumber(benchmarkIntensityRaw)} tCO₂e/t coal
-                    </span>
-                    .
-                  </p>
-                )}
-              </div>
-
-              {/* 3. Performance vs benchmark */}
-              <div className="mb-4">
-                <h3 className="text-sm font-semibold text-gray-700 mb-1">
-                  3. Performance vs benchmark
-                </h3>
-                {comparisonDelta == null ? (
-                  <p className="text-xs text-gray-500">
-                    Once both current and benchmark values are available, we
-                    will show how far your coal intensity is above or below
-                    target.
-                  </p>
-                ) : (
-                  <p className="text-sm text-gray-700">
-                    Latest coal intensity is{" "}
-                    <span className="font-semibold">
-                      {formatNumber(currentIntensity)} tCO₂e/t coal
-                    </span>
-                    , which is{" "}
-                    <span
-                      className={`font-semibold ${
-                        comparisonDelta > 0
-                          ? "text-red-600"
-                          : "text-emerald-600"
-                      }`}
-                    >
-                      {formatNumber(Math.abs(comparisonPercent), 1)}%
-                      {comparisonDelta > 0 ? " above" : " below"}
-                    </span>{" "}
-                    the benchmark.
-                  </p>
-                )}
-              </div>
-
-              {/* 4. AI Recommendations */}
-              <div className="mt-2">
-                <h3 className="text-sm font-semibold text-gray-700 mb-2">
-                  4. AI Recommendations
-                </h3>
-                <ul className="list-disc list-inside text-gray-700 space-y-2 text-sm sm:text-base leading-relaxed max-h-[260px] overflow-y-auto pr-1">
-                  {aiLoading || loading ? (
-                    <li className="text-gray-400">
-                      Loading AI insights for coal emissions…
-                    </li>
-                  ) : topInsights.length > 0 ? (
-                    topInsights.map((note, idx) => <li key={idx}>{note}</li>)
-                  ) : (
-                    <li className="text-gray-400">
-                      No AI insights available for this dataset yet.
-                    </li>
-                  )}
-                </ul>
-              </div>
-            </div>
+            <AIInsightPanel
+              topic="Coal Emissions"
+              baselineIntensity={baselineIntensity}
+              benchmarkIntensity={benchmarkIntensityRaw}
+              currentIntensity={currentIntensity}
+              comparisonDelta={comparisonDelta}
+              comparisonPercent={comparisonPercent}
+              insights={topInsights}
+              loading={loading}
+              intensityUnit="tCO₂e/t coal"
+              borderColor="slate-100"
+            />
           </div>
         )}
       </div>

@@ -1,4 +1,4 @@
-// src/pages/environment/Carbon.jsx (or your current path)
+// src/pages/environment/Carbon.jsx
 import React, { useContext, useEffect, useState } from "react";
 import { Line } from "react-chartjs-2";
 import {
@@ -13,6 +13,8 @@ import {
 import { FaFilePdf, FaCloud } from "react-icons/fa";
 import { jsPDF } from "jspdf";
 import { SimulationContext } from "../../context/SimulationContext";
+import AIInsightPanel from "../../components/AIInsightPanel";
+import { API_BASE_URL } from "../../config/api";
 
 ChartJS.register(
   LineElement,
@@ -22,45 +24,6 @@ ChartJS.register(
   Tooltip,
   Legend
 );
-
-const API_BASE_URL = "https://esg-backend-beige.vercel.app";
-
-// --- Helper: derive suggested actions from carbon insights (like Social/Gov) ---
-const deriveCarbonActions = (insights) => {
-  const text = insights.join(" ").toLowerCase();
-  const actions = new Set();
-
-  if (text.includes("intensity") || text.includes("intensities")) {
-    actions.add("Set year-on-year carbon intensity reduction targets");
-    actions.add("Link intensity KPIs to operational managers");
-  }
-  if (text.includes("scope 1") || text.includes("fuel") || text.includes("combustion")) {
-    actions.add("Optimise fuel mix and combustion efficiency");
-    actions.add("Investigate low-carbon fuel switching opportunities");
-  }
-  if (text.includes("scope 2") || text.includes("electricity") || text.includes("grid")) {
-    actions.add("Increase renewable electricity procurement (PPAs, I-RECs)");
-    actions.add("Run targeted energy efficiency projects at high-load sites");
-  }
-  if (text.includes("scope 3") || text.includes("value chain") || text.includes("supply chain")) {
-    actions.add("Engage key suppliers on carbon disclosure and targets");
-    actions.add("Integrate embodied carbon into procurement criteria");
-  }
-  if (text.includes("carbon tax") || text.includes("tax")) {
-    actions.add("Quantify carbon tax exposure under different price scenarios");
-    actions.add("Prioritise abatement projects with highest tax savings");
-  }
-  if (text.includes("offset") || text.includes("credit")) {
-    actions.add("Review quality and additionality of carbon offsets used");
-    actions.add("Develop a strategy to reduce reliance on offsets over time");
-  }
-
-  if (actions.size === 0 && insights.length > 0) {
-    actions.add("Translate AI insights into a 12–24 month decarbonisation roadmap");
-  }
-
-  return Array.from(actions);
-};
 
 export default function Carbon() {
   const {
@@ -80,7 +43,6 @@ export default function Carbon() {
   const [carbonIntensityValues, setCarbonIntensityValues] = useState(
     new Array(12).fill(0)
   );
-
   const [topInsights, setTopInsights] = useState([]);
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState(null);
@@ -135,14 +97,25 @@ export default function Carbon() {
     }
   }, [environmentalMetrics]);
 
-  // ---------- Real AI insights (live) with robust error handling + fallback ----------
+  // Load live carbon insights from backend with context fallback
   useEffect(() => {
-    const topicKeywords = ["carbon", "co2", "emission", "emissions", "ghg", "scope"];
-
+    const topicKeywords = [
+      "carbon",
+      "co2",
+      "emission",
+      "emissions",
+      "ghg",
+      "scope",
+    ];
     const matchesTopic = (text = "") => {
       const lower = String(text).toLowerCase();
       return topicKeywords.some((kw) => lower.includes(kw));
     };
+
+    const fallbackInsights = Array.isArray(environmentalInsights)
+      ? environmentalInsights
+      : [];
+    const fallbackFiltered = fallbackInsights.filter(matchesTopic);
 
     const loadInsights = async () => {
       try {
@@ -150,15 +123,11 @@ export default function Carbon() {
         setAiError(null);
 
         const res = await fetch(`${API_BASE_URL}/api/environmental-insights`);
-
         if (!res.ok) {
           const text = await res.text();
-          console.error(
-            "Error response from /api/environmental-insights (carbon):",
-            res.status,
-            text
+          throw new Error(
+            `Environmental insights request failed (${res.status}): ${text}`
           );
-          throw new Error(`Backend error ${res.status}: ${text}`);
         }
 
         const data = await res.json();
@@ -169,32 +138,28 @@ export default function Carbon() {
           : [];
 
         const filtered = incoming.filter(matchesTopic);
-
         if (filtered.length > 0) {
-          // ✅ Use real AI from backend, carbon-specific
           setTopInsights(filtered.slice(0, 5));
-        } else if (Array.isArray(environmentalInsights)) {
-          // Fallback to context if backend returns nothing useful
-          const fallbackFiltered = environmentalInsights.filter(matchesTopic);
+        } else {
           setTopInsights(
             (fallbackFiltered.length > 0
               ? fallbackFiltered
-              : environmentalInsights
+              : fallbackInsights
             ).slice(0, 5)
           );
-        } else {
-          setTopInsights([]);
         }
-
-        setAiLoading(false);
       } catch (err) {
-        console.error("Error loading carbon AI insights:", err);
-        if (Array.isArray(environmentalInsights)) {
-          setTopInsights(environmentalInsights.slice(0, 5));
-        } else {
-          setTopInsights([]);
-        }
-        setAiError("Failed to load live AI insights for carbon.");
+        console.error("Carbon AI insights error:", err);
+        setAiError(
+          err.message || "Failed to load live AI insights for carbon."
+        );
+        setTopInsights(
+          (fallbackFiltered.length > 0
+            ? fallbackFiltered
+            : fallbackInsights
+          ).slice(0, 5)
+        );
+      } finally {
         setAiLoading(false);
       }
     };
@@ -203,12 +168,6 @@ export default function Carbon() {
   }, [environmentalInsights]);
 
   // ---------- AI-style baseline / benchmark calculations ----------
-  const formatNumber = (value, decimals = 1) => {
-    if (value === null || value === undefined || Number.isNaN(value)) {
-      return "N/A";
-    }
-    return Number(value).toFixed(decimals);
-  };
 
   const nonZeroIntensities = carbonIntensityValues.filter((v) => v > 0);
 
@@ -255,8 +214,6 @@ export default function Carbon() {
         backgroundColor: "rgba(239,68,68,0.18)",
         tension: 0.35,
         pointRadius: 3,
-        pointHoverRadius: 5,
-        fill: true,
       },
       {
         label: "Production Output (tonnes)",
@@ -265,8 +222,6 @@ export default function Carbon() {
         backgroundColor: "rgba(14,165,233,0.18)",
         tension: 0.35,
         pointRadius: 3,
-        pointHoverRadius: 5,
-        fill: true,
       },
     ],
   };
@@ -281,8 +236,6 @@ export default function Carbon() {
         backgroundColor: "rgba(34,197,94,0.18)",
         tension: 0.35,
         pointRadius: 3,
-        pointHoverRadius: 5,
-        fill: true,
       },
     ],
   };
@@ -341,8 +294,6 @@ export default function Carbon() {
     emissionDataValues.every((v) => v === 0) &&
     productionDataValues.every((v) => v === 0);
 
-  const actionChips = deriveCarbonActions(topInsights);
-
   return (
     <div className="min-h-screen bg-gradient-to-b from-rose-50 via-emerald-50/40 to-rose-50 py-10 font-sans flex justify-center">
       <div className="w-full max-w-7xl px-4 sm:px-6 lg:px-8">
@@ -363,19 +314,22 @@ export default function Carbon() {
             {loading && (
               <p className="mt-2 text-xs text-rose-700 flex items-center gap-2">
                 <span className="h-2 w-2 rounded-full bg-rose-500 animate-pulse" />
-                Loading carbon metrics…
+                Loading carbon metrics and AI insights…
               </p>
             )}
             {aiLoading && !loading && (
-              <p className="mt-1 text-xs text-rose-700 flex items-center gap-2">
+              <p className="mt-2 text-xs text-rose-700 flex items-center gap-2">
                 <span className="h-2 w-2 rounded-full bg-rose-500 animate-pulse" />
-                Loading live AI insights…
+                Loading live AI insights for carbon…
               </p>
             )}
             {error && (
               <p className="mt-2 text-xs text-red-600">
                 {error}
               </p>
+            )}
+            {aiError && (
+              <p className="mt-1 text-xs text-red-500">{aiError}</p>
             )}
           </div>
 
@@ -464,15 +418,8 @@ export default function Carbon() {
                     data={emissionData}
                     options={{
                       maintainAspectRatio: false,
-                      interaction: { mode: "index", intersect: false },
                       plugins: {
                         legend: { position: "bottom", labels: { boxWidth: 12 } },
-                        tooltip: {
-                          callbacks: {
-                            label: (ctx) =>
-                              `${ctx.dataset.label}: ${ctx.formattedValue}`,
-                          },
-                        },
                       },
                       scales: {
                         x: { grid: { display: false } },
@@ -491,6 +438,9 @@ export default function Carbon() {
                   <h2 className="text-xl sm:text-2xl font-semibold text-gray-800">
                     Carbon Intensity (tCO₂e per tonne)
                   </h2>
+                  <span className="text-[11px] px-2 py-1 rounded-full bg-emerald-50 text-emerald-700 font-semibold uppercase tracking-wide">
+                    Carbon KPI
+                  </span>
                 </div>
                 <p className="text-xs text-gray-500 mb-4">
                   Emissions normalised by production – lower is better.
@@ -500,7 +450,6 @@ export default function Carbon() {
                     data={intensityData}
                     options={{
                       maintainAspectRatio: false,
-                      interaction: { mode: "index", intersect: false },
                       plugins: {
                         legend: { position: "bottom", labels: { boxWidth: 12 } },
                       },
@@ -518,132 +467,18 @@ export default function Carbon() {
             </div>
 
             {/* AI Baseline / Benchmark / Comparison / Recommendations */}
-            <div className="bg-white rounded-2xl shadow-lg border border-rose-100/80 p-6 flex flex-col">
-              <h2 className="text-xl font-semibold text-gray-800 mb-2">
-                AI Analysis – Carbon
-              </h2>
-              <p className="text-xs text-gray-500 mb-3">
-                Baseline, benchmark and performance vs target for carbon
-                intensity, plus AI recommendations from AfricaESG.AI.
-              </p>
-
-              {aiError && (
-                <p className="text-xs text-red-500 mb-2">{aiError}</p>
-              )}
-
-              {/* 1. Baseline */}
-              <div className="mb-4">
-                <h3 className="text-sm font-semibold text-gray-700 mb-1">
-                  1. Baseline
-                </h3>
-                {baselineIntensity == null ? (
-                  <p className="text-xs text-gray-500">
-                    Upload at least one month of emissions and production data
-                    to establish a baseline carbon intensity.
-                  </p>
-                ) : (
-                  <p className="text-sm text-gray-700">
-                    Average early-period carbon intensity is{" "}
-                    <span className="font-semibold">
-                      {formatNumber(baselineIntensity)} tCO₂e/tonne
-                    </span>
-                    , based on the first non-zero months in your dataset.
-                  </p>
-                )}
-              </div>
-
-              {/* 2. Benchmark */}
-              <div className="mb-4">
-                <h3 className="text-sm font-semibold text-gray-700 mb-1">
-                  2. Benchmark
-                </h3>
-                {benchmarkIntensityRaw == null ? (
-                  <p className="text-xs text-gray-500">
-                    No benchmark provided yet. The baseline is currently used as
-                    a proxy benchmark for carbon intensity.
-                  </p>
-                ) : (
-                  <p className="text-sm text-gray-700">
-                    Target / benchmark carbon intensity is{" "}
-                    <span className="font-semibold">
-                      {formatNumber(benchmarkIntensityRaw)} tCO₂e/tonne
-                    </span>
-                    .
-                  </p>
-                )}
-              </div>
-
-              {/* 3. Performance vs benchmark */}
-              <div className="mb-4">
-                <h3 className="text-sm font-semibold text-gray-700 mb-1">
-                  3. Performance vs benchmark
-                </h3>
-                {comparisonDelta == null ? (
-                  <p className="text-xs text-gray-500">
-                    Once both current and benchmark values are available, we
-                    will show how far your carbon intensity is above or below
-                    target.
-                  </p>
-                ) : (
-                  <p className="text-sm text-gray-700">
-                    Latest carbon intensity is{" "}
-                      <span className="font-semibold">
-                        {formatNumber(currentIntensity)} tCO₂e/tonne
-                      </span>
-                      , which is{" "}
-                      <span
-                        className={`font-semibold ${
-                          comparisonDelta > 0
-                            ? "text-red-600"
-                            : "text-emerald-600"
-                        }`}
-                      >
-                        {formatNumber(Math.abs(comparisonPercent), 1)}%
-                        {comparisonDelta > 0 ? " above" : " below"}
-                      </span>{" "}
-                      the benchmark.
-                  </p>
-                )}
-              </div>
-
-              {/* 4. AI Recommendations + action chips */}
-              <div className="mt-2">
-                <h3 className="text-sm font-semibold text-gray-700 mb-2">
-                  4. AI Recommendations
-                </h3>
-                <ul className="list-disc list-inside text-gray-700 space-y-2 text-sm sm:text-base leading-relaxed max-h-[200px] overflow-y-auto pr-1">
-                  {aiLoading || loading ? (
-                    <li className="text-gray-400">
-                      Loading AI insights for carbon performance…
-                    </li>
-                  ) : topInsights.length > 0 ? (
-                    topInsights.map((note, idx) => <li key={idx}>{note}</li>)
-                  ) : (
-                    <li className="text-gray-400">
-                      No AI insights available for this dataset yet.
-                    </li>
-                  )}
-                </ul>
-
-                {actionChips.length > 0 && (
-                  <div className="mt-4 border-t border-rose-100 pt-3">
-                    <p className="text-xs sm:text-sm text-gray-500 mb-2">
-                      Suggested next steps based on these AI insights:
-                    </p>
-                    <div className="flex flex-wrap gap-2">
-                      {actionChips.map((chip) => (
-                        <span
-                          key={chip}
-                          className="px-2.5 py-1 rounded-full bg-rose-50 text-rose-700 text-[11px] border border-rose-100"
-                        >
-                          {chip}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
+            <AIInsightPanel
+              topic="Carbon"
+              baselineIntensity={baselineIntensity}
+              benchmarkIntensity={benchmarkIntensityRaw}
+              currentIntensity={currentIntensity}
+              comparisonDelta={comparisonDelta}
+              comparisonPercent={comparisonPercent}
+              insights={topInsights}
+              loading={loading || aiLoading}
+              intensityUnit="tCO₂e/tonne"
+              borderColor="rose-100"
+            />
           </div>
         )}
       </div>
